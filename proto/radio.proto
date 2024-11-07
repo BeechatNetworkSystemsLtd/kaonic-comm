@@ -17,21 +17,21 @@ service Radio {
 }
 
 message RadioFrame {
-    bytes data = 1;
+    repeated uint32 data = 1;
     uint32 length = 2;
     uint32 crc32 = 3;
 }
 
 message ConfigurationRequest {
-    int32 module = 1;
+    uint32 module = 1;
     TrxType trx_type = 2;
     uint32 freq = 3;
     uint32 channel = 4;
-    uint32 channelSpacing = 5;
+    uint32 channel_spacing = 5;
 }
 
 message TransmitRequest {
-    int32 module = 1;
+    uint32 module = 1;
     TrxType trx_type = 2;
     RadioFrame frame = 3;
 }
@@ -41,7 +41,7 @@ message TransmitResponse {
 }
 
 message ReceiveRequest {
-    int32 module = 1;
+    uint32 module = 1;
     TrxType trx_type = 2;
     uint32 timeout = 3;
 }

@@ -27,7 +27,7 @@ struct radio_config final {
     uint32_t channel_spacing = 0;
 };
 
-struct tx_packet final {
+struct tx_request final {
     uint8_t mobule = 0;
     trx_type type = trx_type::rf09;
     radio_frame frame;
@@ -43,7 +43,7 @@ struct rx_request final {
     uint32_t timeout = 0;
 };
 
-struct rx_packet final {
+struct rx_response final {
     radio_frame frame;
     int8_t rssi = 0;
     uint32_t latency = 0;
@@ -54,24 +54,24 @@ class radio {
 public:
     virtual ~radio() = default;
 
-    virtual auto open() -> error = 0;
+    virtual auto open(const radio_config& config) -> error = 0;
 
-    virtual auto transmit(const tx_packet& packet, tx_response& response) -> error = 0;
+    virtual auto transmit(const tx_request& request, tx_response& response) -> error = 0;
 
-    virtual auto recieve(const rx_request& request, rx_packet& packet) -> error = 0;
+    virtual auto recieve(const rx_request& request, rx_response& response) -> error = 0;
 
-    virtual auto set_config(const radio_config& config) -> error = 0;
+    virtual auto configure(const radio_config& config) -> error = 0;
 
     virtual auto close() -> void = 0;
 
 protected:
     explicit radio() = default;
 
-    radio(const radio&) = delete;
-    radio(radio&&) = delete;
+    radio(const radio&) = default;
+    radio(radio&&) = default;
 
-    radio& operator=(const radio&) = delete;
-    radio& operator=(radio&&) = delete;
+    radio& operator=(const radio&) = default;
+    radio& operator=(radio&&) = default;
 };
 
 } // namespace kaonic::comm

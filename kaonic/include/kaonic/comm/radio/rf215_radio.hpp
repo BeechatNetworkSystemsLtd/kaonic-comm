@@ -8,15 +8,15 @@ class rf215_radio final : public radio {
 
 public:
     explicit rf215_radio() = default;
-    ~rf215_radio() = default;
+    ~rf215_radio();
 
-    [[nodiscard]] auto open() -> error final;
+    [[nodiscard]] auto open(const radio_config& config) -> error final;
 
-    [[nodiscard]] auto transmit(const tx_packet& packet, tx_response& response) -> error final;
+    [[nodiscard]] auto transmit(const tx_request& request, tx_response& response) -> error final;
 
-    [[nodiscard]] auto recieve(const rx_request& request, rx_packet& packet) -> error final;
+    [[nodiscard]] auto recieve(const rx_request& request, rx_response& response) -> error final;
 
-    [[nodiscard]] auto set_config(const radio_config& config) -> error final;
+    [[nodiscard]] auto configure(const radio_config& config) -> error final;
 
     auto close() -> void final;
 

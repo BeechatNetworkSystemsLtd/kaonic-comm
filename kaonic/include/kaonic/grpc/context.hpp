@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include "kaonic/comm/radio/radio.hpp"
 
@@ -10,12 +10,12 @@ namespace kaonic::grpc {
 class context {
 
 public:
-    explicit context(std::unique_ptr<comm::radio> radio, const std::string& version);
-    ~context();
+    explicit context(std::unique_ptr<comm::radio> radio, std::string_view version);
+    ~context() = default;
 
     [[nodiscard]] auto get_radio() const -> comm::radio&;
 
-    [[nodiscard]] auto get_version() const -> std::string;
+    [[nodiscard]] auto get_version() const -> std::string_view;
 
 protected:
     context(const context&) = delete;
@@ -25,9 +25,9 @@ protected:
     context& operator=(context&&) noexcept = delete;
 
 private:
-    std::unique_ptr<comm::radio> _radio = nullptr;
+    std::unique_ptr<comm::radio> _radio;
 
-    std::string _version;
+    std::string_view _version;
 };
 
 } // namespace kaonic::grpc

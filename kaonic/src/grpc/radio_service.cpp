@@ -14,7 +14,7 @@ static auto grpc_buf_pack(const google::protobuf::RepeatedField<uint32_t>& src, 
 static auto
 grpc_buf_unpack(uint8_t src[], google::protobuf::RepeatedField<uint32_t>* dst, size_t len) -> void {
     size_t dst_size = len / sizeof(uint32_t);
-    dst_size += len - dst_size * sizeof(uint32_t);
+    dst_size += (len - dst_size * sizeof(uint32_t)) ? 1 : 0;
     dst->Resize(dst_size, 0);
     std::memcpy(dst->begin(), src, len);
 }

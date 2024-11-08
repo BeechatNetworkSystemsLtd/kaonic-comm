@@ -130,7 +130,7 @@ auto kaonic::grpc::radio_service::ReceiveStream(::grpc::ServerContext* context,
     error err {};
 
     ReceiveResponse response;
-    while (!context->IsCancelled()) {
+    while (context && !context->IsCancelled()) {
         err = radio.recieve(rx_request, rx_response);
         switch (err.code) {
             case error_code::ok:
@@ -154,7 +154,7 @@ auto kaonic::grpc::radio_service::ReceiveStream(::grpc::ServerContext* context,
         auto data = frame->mutable_data();
         grpc_buf_unpack(resp_frame.data, data, resp_frame.len);
 
-        if (!writer->Write(response)) {
+        if (!writer || !writer->Write(response)) {
             log::error("[Radio Service] Unable to write to the client stream");
             return ::grpc::Status(::grpc::StatusCode::ABORTED,
                                   "Unable to write to the client stream");

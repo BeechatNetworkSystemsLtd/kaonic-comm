@@ -13,7 +13,7 @@ service Radio {
     rpc Configure(ConfigurationRequest) returns (kaonic.Empty) {}
     rpc Transmit(TransmitRequest) returns (TransmitResponse) {}
     rpc Receive(ReceiveRequest) returns (ReceiveResponse) {}
-    rpc ReceiveStream(kaonic.Empty) returns (stream RadioFrame) {}
+    rpc ReceiveStream(ReceiveRequest) returns (stream ReceiveResponse) {}
 }
 
 message RadioFrame {

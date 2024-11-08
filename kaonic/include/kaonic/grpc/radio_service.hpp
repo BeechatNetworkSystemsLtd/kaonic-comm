@@ -26,8 +26,8 @@ public:
                                ReceiveResponse* response) -> ::grpc::Status final;
 
     [[nodiscard]] auto ReceiveStream(::grpc::ServerContext* context,
-                                     const Empty* request,
-                                     ::grpc::ServerWriter<RadioFrame>* writer)
+                                     const ReceiveRequest* request,
+                                     ::grpc::ServerWriter<ReceiveResponse>* writer)
         -> ::grpc::Status final;
 
 protected:

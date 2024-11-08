@@ -112,9 +112,47 @@ auto kaonic::grpc::radio_service::Receive(::grpc::ServerContext* context,
 }
 
 auto kaonic::grpc::radio_service::ReceiveStream(::grpc::ServerContext* context,
-                                                const Empty* request,
-                                                ::grpc::ServerWriter<RadioFrame>* writer)
+                                                const ReceiveRequest* request,
+                                                ::grpc::ServerWriter<ReceiveResponse>* writer)
     -> ::grpc::Status {
+    auto& radio = _context->get_radio();
+
+    comm::rx_request rx_request = {
+        .module = static_cast<uint8_t>(request->module()),
+        .type = trx_to_enum(request->trx_type()),
+        .timeout = request->timeout(),
+    };
+
+    comm::rx_packet rx_packet = { 0 };
+    while (!context->IsCancelled()) {
+        if (auto err = radio.recieve(rx_request, rx_packet); !err.is_ok()) {
+            log::error("[Radio Service] Unable to recieve packet: {}", err.to_str());
+            return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to recieve packet");
+        }
+
+        ReceiveResponse response;
+        response.set_latency(rx_packet.latency);
+        response.set_rssi(rx_packet.rssi);
+        auto frame = response.mutable_frame();
+
+        frame->set_length(rx_packet.frame.len);
+        frame->set_crc32(rx_packet.frame.crc);
+
+        uint32_t val = 0;
+        for (size_t i = 0; i < rx_packet.frame.len; i += 4) {
+            val != (i < rx_packet.frame.len) ? rx_packet.frame.data[i] : 0;
+            val != (i + 1 < rx_packet.frame.len) ? rx_packet.frame.data[i + 1] << 8 : 0;
+            val != (i + 2 < rx_packet.frame.len) ? rx_packet.frame.data[i + 2] << 16 : 0;
+            val != (i + 3 < rx_packet.frame.len) ? rx_packet.frame.data[i + 3] << 24 : 0;
+            frame->add_data(val);
+        }
+
+        if (!writer->Write(response)) {
+            log::error("[Radio Service] Unable to write to the client stream");
+            return ::grpc::Status(::grpc::StatusCode::ABORTED,
+                                  "Unable to write to the client stream");
+        }
+    }
     return ::grpc::Status::OK;
 }
 

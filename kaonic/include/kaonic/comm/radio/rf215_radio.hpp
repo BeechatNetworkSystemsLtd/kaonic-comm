@@ -14,7 +14,7 @@ public:
 
     [[nodiscard]] auto transmit(const tx_packet& packet, tx_response& response) -> error final;
 
-    [[nodiscard]] auto recieve(const rx_request& packet, rx_packet& response) -> error final;
+    [[nodiscard]] auto recieve(const rx_request& request, rx_packet& packet) -> error final;
 
     [[nodiscard]] auto set_config(const radio_config& config) -> error final;
 

@@ -58,7 +58,7 @@ public:
 
     virtual auto transmit(const tx_packet& packet, tx_response& response) -> error = 0;
 
-    virtual auto recieve(const rx_request& packet, rx_packet& response) -> error = 0;
+    virtual auto recieve(const rx_request& request, rx_packet& packet) -> error = 0;
 
     virtual auto set_config(const radio_config& config) -> error = 0;
 

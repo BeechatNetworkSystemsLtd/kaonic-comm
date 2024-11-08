@@ -1,20 +1,22 @@
 #include "kaonic/grpc/radio_service.hpp"
 
+#include <cstring>
+
 #include "kaonic/comm/common/logging.hpp"
 
 namespace kaonic::grpc {
 
 static auto grpc_buf_pack(const google::protobuf::RepeatedField<uint32_t>& src, uint8_t dst[])
     -> void {
-    std::copy(src.begin(), src.end(), dst);
+    std::memcpy(dst, src.data(), src.size() * sizeof(uint32_t));
 }
 
 static auto
 grpc_buf_unpack(uint8_t src[], google::protobuf::RepeatedField<uint32_t>* dst, size_t len) -> void {
-    size_t dst_size = len / 4;
-    dst_size += len - dst_size * 4;
+    size_t dst_size = len / sizeof(uint32_t);
+    dst_size += len - dst_size * sizeof(uint32_t);
     dst->Resize(dst_size, 0);
-    std::copy(src, src + len, dst->begin());
+    std::memcpy(dst->begin(), src, len);
 }
 
 constexpr static auto trx_to_enum(TrxType type) noexcept -> comm::trx_type {

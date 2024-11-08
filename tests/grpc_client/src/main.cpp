@@ -33,8 +33,9 @@ auto main(int argc, char** argv) noexcept -> int {
         log::info("[Client] Recieved frame length: {}", frame.length());
         log::info("[Client] Recieved frame crc32: {}", frame.crc32());
         log::info("[Client] Recieved frame buffer elements: ");
-        for (const auto& data : frame.data()) {
-            log::info("[Client] {}", data);
+        auto bytes_ptr = reinterpret_cast<const uint8_t*>(frame.data().begin());
+        for (size_t i = 0; i < frame.length(); ++i) {
+            log::info("[Client] {}", bytes_ptr[i]);
         }
     }
     return 0;

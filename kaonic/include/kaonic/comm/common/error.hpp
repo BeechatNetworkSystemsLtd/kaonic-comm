@@ -7,6 +7,7 @@ enum class error_code {
     fail,
     invalid_arg,
     precondition_failed,
+    timeout,
 };
 
 struct error final {
@@ -40,6 +41,10 @@ struct error final {
         return error { error_code::precondition_failed };
     }
 
+    [[nodiscard]] static constexpr auto timeout() noexcept -> error {
+        return error { error_code::timeout };
+    }
+
     constexpr auto with(const error& err) noexcept -> void {
         if (!is_ok() || !err.is_ok()) {
             code = error_code::fail;
@@ -63,6 +68,8 @@ struct error final {
                 return "invalid arg";
             case error_code::precondition_failed:
                 return "precondition_failed";
+            case error_code::timeout:
+                return "timeout";
             default:
                 return "unknown";
         }

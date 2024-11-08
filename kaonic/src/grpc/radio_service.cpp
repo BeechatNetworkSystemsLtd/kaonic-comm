@@ -4,6 +4,19 @@
 
 namespace kaonic::grpc {
 
+static auto grpc_buf_pack(const google::protobuf::RepeatedField<uint32_t>& src, uint8_t dst[])
+    -> void {
+    std::copy(src.begin(), src.end(), dst);
+}
+
+static auto
+grpc_buf_unpack(uint8_t src[], google::protobuf::RepeatedField<uint32_t>* dst, size_t len) -> void {
+    size_t dst_size = len / 4;
+    dst_size += len - dst_size * 4;
+    dst->Resize(dst_size, 0);
+    std::copy(src, src + len, dst->begin());
+}
+
 constexpr static auto trx_to_enum(TrxType type) noexcept -> comm::trx_type {
     switch (type) {
         case TrxType::RF09:
@@ -32,7 +45,7 @@ auto radio_service::Configure(::grpc::ServerContext* context,
 
     auto& radio = _context->get_radio();
 
-    if (auto err = radio.set_config(config); !err.is_ok()) {
+    if (auto err = radio.configure(config); !err.is_ok()) {
         log::error("[Radio Service] Unable to set config: {}", err.to_str());
         return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to set config");
     }
@@ -48,7 +61,7 @@ auto kaonic::grpc::radio_service::Transmit(::grpc::ServerContext* context,
 
     auto& radio = _context->get_radio();
 
-    comm::tx_packet tx_packet = {
+    comm::tx_request tx_request = {
         .mobule = static_cast<uint8_t>(request->module()),
         .type = trx_to_enum(request->trx_type()),
         .frame = {
@@ -56,17 +69,10 @@ auto kaonic::grpc::radio_service::Transmit(::grpc::ServerContext* context,
             .crc = frame.crc32(),
         },
     };
-
-    uint32_t pos = 0;
-    uint32_t val = 0;
-    for (size_t i = 0; i < data_size; ++i) {
-        pos = i % 4;
-        val = data[pos];
-        tx_packet.frame.data[i] = static_cast<uint8_t>((val >> (pos * 8)) & 0xff);
-    }
+    grpc_buf_pack(data, tx_request.frame.data);
 
     comm::tx_response tx_response = { 0 };
-    if (auto err = radio.transmit(tx_packet, tx_response); !err.is_ok()) {
+    if (auto err = radio.transmit(tx_request, tx_response); !err.is_ok()) {
         log::error("[Radio Service] Unable to transmit packet: {}", err.to_str());
         return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to transmit packet");
     }
@@ -86,27 +92,22 @@ auto kaonic::grpc::radio_service::Receive(::grpc::ServerContext* context,
         .timeout = request->timeout(),
     };
 
-    comm::rx_packet rx_packet = { 0 };
-    if (auto err = radio.recieve(rx_request, rx_packet); !err.is_ok()) {
+    comm::rx_response rx_response = { 0 };
+    if (auto err = radio.recieve(rx_request, rx_response); !err.is_ok()) {
         log::error("[Radio Service] Unable to recieve packet: {}", err.to_str());
         return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to recieve packet");
     }
 
-    response->set_latency(rx_packet.latency);
-    response->set_rssi(rx_packet.rssi);
+    response->set_latency(rx_response.latency);
+    response->set_rssi(rx_response.rssi);
     auto frame = response->mutable_frame();
 
-    frame->set_length(rx_packet.frame.len);
-    frame->set_crc32(rx_packet.frame.crc);
+    auto& resp_frame = rx_response.frame;
+    frame->set_length(resp_frame.len);
+    frame->set_crc32(resp_frame.crc);
 
-    uint32_t val = 0;
-    for (size_t i = 0; i < rx_packet.frame.len; i += 4) {
-        val != (i < rx_packet.frame.len) ? rx_packet.frame.data[i] : 0;
-        val != (i + 1 < rx_packet.frame.len) ? rx_packet.frame.data[i + 1] << 8 : 0;
-        val != (i + 2 < rx_packet.frame.len) ? rx_packet.frame.data[i + 2] << 16 : 0;
-        val != (i + 3 < rx_packet.frame.len) ? rx_packet.frame.data[i + 3] << 24 : 0;
-        frame->add_data(val);
-    }
+    auto data = frame->mutable_data();
+    grpc_buf_unpack(resp_frame.data, data, resp_frame.len);
 
     return ::grpc::Status::OK;
 }
@@ -123,29 +124,33 @@ auto kaonic::grpc::radio_service::ReceiveStream(::grpc::ServerContext* context,
         .timeout = request->timeout(),
     };
 
-    comm::rx_packet rx_packet = { 0 };
+    comm::rx_response rx_response = { 0 };
+    error err {};
+
+    ReceiveResponse response;
     while (!context->IsCancelled()) {
-        if (auto err = radio.recieve(rx_request, rx_packet); !err.is_ok()) {
-            log::error("[Radio Service] Unable to recieve packet: {}", err.to_str());
-            return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to recieve packet");
+        err = radio.recieve(rx_request, rx_response);
+        switch (err.code) {
+            case error_code::ok:
+                break;
+            case error_code::timeout:
+                log::warn("[Radio Service] Radio RX timeout exceed");
+                continue;
+            default:
+                log::error("[Radio Service] Unable to recieve packet: {}", err.to_str());
+                return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to recieve packet");
         }
 
-        ReceiveResponse response;
-        response.set_latency(rx_packet.latency);
-        response.set_rssi(rx_packet.rssi);
+        response.set_latency(rx_response.latency);
+        response.set_rssi(rx_response.rssi);
         auto frame = response.mutable_frame();
 
-        frame->set_length(rx_packet.frame.len);
-        frame->set_crc32(rx_packet.frame.crc);
+        auto& resp_frame = rx_response.frame;
+        frame->set_length(resp_frame.len);
+        frame->set_crc32(resp_frame.crc);
 
-        uint32_t val = 0;
-        for (size_t i = 0; i < rx_packet.frame.len; i += 4) {
-            val != (i < rx_packet.frame.len) ? rx_packet.frame.data[i] : 0;
-            val != (i + 1 < rx_packet.frame.len) ? rx_packet.frame.data[i + 1] << 8 : 0;
-            val != (i + 2 < rx_packet.frame.len) ? rx_packet.frame.data[i + 2] << 16 : 0;
-            val != (i + 3 < rx_packet.frame.len) ? rx_packet.frame.data[i + 3] << 24 : 0;
-            frame->add_data(val);
-        }
+        auto data = frame->mutable_data();
+        grpc_buf_unpack(resp_frame.data, data, resp_frame.len);
 
         if (!writer->Write(response)) {
             log::error("[Radio Service] Unable to write to the client stream");

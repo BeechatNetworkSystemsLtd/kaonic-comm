@@ -12,6 +12,7 @@ class radio_service final : public Radio::Service {
 
 public:
     explicit radio_service(const std::shared_ptr<context>& context);
+    ~radio_service() = default;
 
     [[nodiscard]] auto Configure(::grpc::ServerContext* context,
                                  const ConfigurationRequest* request,
@@ -31,14 +32,14 @@ public:
         -> ::grpc::Status final;
 
 protected:
-    radio_service(const radio_service&) = default;
-    radio_service(radio_service&&) = default;
+    radio_service(const radio_service&) = delete;
+    radio_service(radio_service&&) noexcept = delete;
 
-    radio_service& operator=(const radio_service&) = default;
-    radio_service& operator=(radio_service&&) = default;
+    radio_service& operator=(const radio_service&) = delete;
+    radio_service& operator=(radio_service&&) noexcept = delete;
 
 private:
-    std::shared_ptr<context> _context = nullptr;
+    std::shared_ptr<context> _context;
 };
 
 } // namespace kaonic::grpc

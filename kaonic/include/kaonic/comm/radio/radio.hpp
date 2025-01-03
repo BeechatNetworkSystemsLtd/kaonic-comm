@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "kaonic/comm/common/error.hpp"
+#include "kaonic/common/error.hpp"
 
 constexpr static auto data_max_size = 2048u;
 

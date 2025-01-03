@@ -3,7 +3,7 @@
 #include <device.grpc.pb.h>
 #include <radio.grpc.pb.h>
 
-#include "kaonic/comm/common/logging.hpp"
+#include "kaonic/common/logging.hpp"
 
 #include <grpc/grpc.h>
 #include <grpcpp/create_channel.h>

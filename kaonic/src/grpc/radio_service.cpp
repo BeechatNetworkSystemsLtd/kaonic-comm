@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#include "kaonic/comm/common/logging.hpp"
+#include "kaonic/common/logging.hpp"
 
 namespace kaonic::grpc {
 

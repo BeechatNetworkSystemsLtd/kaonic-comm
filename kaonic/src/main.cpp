@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "kaonic/comm/common/logging.hpp"
 #include "kaonic/comm/radio/rf215_radio.hpp"
+#include "kaonic/common/logging.hpp"
 #include "kaonic/grpc/context.hpp"
 #include "kaonic/grpc/device_service.hpp"
 #include "kaonic/grpc/radio_service.hpp"

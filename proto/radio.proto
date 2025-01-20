@@ -4,36 +4,27 @@ import "empty.proto";
 
 package kaonic;
 
-enum TrxType {
-    RF09 = 0;
-    RF24 = 1;
- }
-
 service Radio {
     rpc Configure(ConfigurationRequest) returns (kaonic.Empty) {}
     rpc Transmit(TransmitRequest) returns (TransmitResponse) {}
-    rpc Receive(ReceiveRequest) returns (ReceiveResponse) {}
     rpc ReceiveStream(ReceiveRequest) returns (stream ReceiveResponse) {}
 }
 
 message RadioFrame {
     repeated uint32 data = 1;
     uint32 length = 2;
-    uint32 crc32 = 3;
 }
 
 message ConfigurationRequest {
     uint32 module = 1;
-    TrxType trx_type = 2;
-    uint32 freq = 3;
-    uint32 channel = 4;
-    uint32 channel_spacing = 5;
+    uint32 freq = 2;
+    uint32 channel = 3;
+    uint32 channel_spacing = 4;
 }
 
 message TransmitRequest {
     uint32 module = 1;
-    TrxType trx_type = 2;
-    RadioFrame frame = 3;
+    RadioFrame frame = 2;
 }
 
 message TransmitResponse {
@@ -42,8 +33,7 @@ message TransmitResponse {
 
 message ReceiveRequest {
     uint32 module = 1;
-    TrxType trx_type = 2;
-    uint32 timeout = 3;
+    uint32 timeout = 2;
 }
 
 message ReceiveResponse {

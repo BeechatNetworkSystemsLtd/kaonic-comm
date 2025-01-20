@@ -5,6 +5,8 @@ target_include_directories(
 
     PUBLIC
         ../include
+        ../../extern/rfnet
+        ../../extern/rf215
 )
 
 target_sources(
@@ -13,16 +15,34 @@ target_sources(
     PRIVATE
         comm/radio/rf215_radio.cpp
 
-        comm/peripheral/peripheral_dispatcher.cpp
-        comm/peripheral/usb_peripheral.cpp
+        comm/drivers/spi.cpp
 
-        grpc/context.cpp
-        grpc/device_service.cpp
-        grpc/radio_service.cpp
+        comm/serial/serial.cpp
+        comm/serial/hdlc.cpp
+        comm/serial/packet.cpp
+
+        comm/mesh/network.cpp
+        comm/mesh/radio_network.cpp
+        comm/mesh/network_receiver.cpp
+
+        comm/services/radio_service.cpp
+        comm/services/grpc_service.cpp
+        comm/services/serial_service.cpp
+
+        ../../extern/rfnet/rfnet.c
+
+        ../../extern/rf215/rf215_regs.c
+        ../../extern/rf215/rf215_baseband.c
+        ../../extern/rf215/rf215_mod.c
+        ../../extern/rf215/rf215.c
 )
 
 target_link_libraries(
     kaonic
+
+    PRIVATE
+        -lgpiodcxx
+        -lz
 
     PUBLIC
         spdlog::spdlog

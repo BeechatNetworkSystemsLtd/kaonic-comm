@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <numeric>
 #include <sstream>
 
@@ -31,7 +32,8 @@ static auto vector_to_string(const std::vector<uint8_t>& vec) noexcept -> std::s
     for (size_t i = 0; i < vec.size(); ++i) {
         if (i > 0)
             oss << " ";
-        oss << static_cast<uint16_t>(vec[i]);
+        oss << "0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
+            << static_cast<uint16_t>(vec[i]);
     }
     return oss.str();
 }

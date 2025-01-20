@@ -21,120 +21,126 @@ using namespace kaonic;
 auto main(int argc, char** argv) noexcept -> int {
     log::info("[Server] Start comm server with FW version {}", kaonic::info::version);
 
-    drivers::spi_config spi1_config = {
-        .device_path = std::string { kaonic::config::spi1.device_path },
-        .speed = kaonic::config::spi1.speed,
-        .mode = kaonic::config::spi1.mode,
-        .bits_per_word = kaonic::config::spi1.bpw,
+    drivers::spi_config spi_a_config = {
+        .device_path = std::string { kaonic::config::rfa_spi.device_path },
+        .speed = kaonic::config::rfa_spi.speed,
+        .mode = kaonic::config::rfa_spi.mode,
+        .bits_per_word = kaonic::config::rfa_spi.bpw,
     };
 
-    drivers::spi_config spi2_config = {
-        .device_path = std::string { kaonic::config::spi2.device_path },
-        .speed = kaonic::config::spi2.speed,
-        .mode = kaonic::config::spi2.mode,
-        .bits_per_word = kaonic::config::spi2.bpw,
+    drivers::spi_config spi_b_config = {
+        .device_path = std::string { kaonic::config::rfb_spi.device_path },
+        .speed = kaonic::config::rfb_spi.speed,
+        .mode = kaonic::config::rfb_spi.mode,
+        .bits_per_word = kaonic::config::rfb_spi.bpw,
     };
 
-    auto spi1 = std::make_unique<drivers::spi>();
-    if (auto err = spi1->open(spi1_config); !err.is_ok()) {
-        log::info("[Server] Unable to open SPI1 driver");
+    auto spi_a = std::make_unique<drivers::spi>();
+    if (auto err = spi_a->open(spi_a_config); !err.is_ok()) {
+        log::info("[Server] Unable to open SPI A driver");
         return -1;
     }
 
-    auto spi2 = std::make_unique<drivers::spi>();
-    if (auto err = spi2->open(spi2_config); !err.is_ok()) {
-        log::info("[Server] Unable to open SPI2 driver");
+    auto spi_b = std::make_unique<drivers::spi>();
+    if (auto err = spi_b->open(spi_b_config); !err.is_ok()) {
+        log::info("[Server] Unable to open SPI B driver");
         return -1;
     }
 
-    comm::radio_context radio_context1;
-    radio_context1.spi = std::move(spi1);
+    comm::radio_context radio_context_a;
+    radio_context_a.spi = std::move(spi_a);
 
-    comm::radio_context radio_context2;
-    radio_context2.spi = std::move(spi2);
+    comm::radio_context radio_context_b;
+    radio_context_b.spi = std::move(spi_b);
 
-    auto gpio_chip1 =
-        gpiod::chip(std::string { kaonic::config::gpio1.chip_name }, gpiod::chip::OPEN_BY_NAME);
+    auto gpio_a_rst_chip = gpiod::chip(std::string { kaonic::config::rfa_gpio.rst_chip_name },
+                                       gpiod::chip::OPEN_BY_NAME);
 
-    auto gpio_chip2 =
-        gpiod::chip(std::string { kaonic::config::gpio2.chip_name }, gpiod::chip::OPEN_BY_NAME);
+    auto gpio_b_rst_chip = gpiod::chip(std::string { kaonic::config::rfb_gpio.rst_chip_name },
+                                       gpiod::chip::OPEN_BY_NAME);
 
-    auto reset_line1 = gpio_chip1.get_line(kaonic::config::gpio1.rst_chip_line);
-    auto handle_line1 = gpio_chip1.get_line(kaonic::config::gpio1.iqr_chip_line);
+    auto gpio_a_irq_chip = gpiod::chip(std::string { kaonic::config::rfa_gpio.irq_chip_name },
+                                       gpiod::chip::OPEN_BY_NAME);
 
-    auto reset_line2 = gpio_chip2.get_line(kaonic::config::gpio2.rst_chip_line);
-    auto handle_line2 = gpio_chip2.get_line(kaonic::config::gpio2.iqr_chip_line);
+    auto gpio_b_irq_chip = gpiod::chip(std::string { kaonic::config::rfb_gpio.irq_chip_name },
+                                       gpiod::chip::OPEN_BY_NAME);
 
-    if (!reset_line1) {
-        log::error("[Server] Unable to get rst line 1 {}", kaonic::config::gpio1.rst_chip_line);
+    auto rst_line_a = gpio_a_rst_chip.get_line(kaonic::config::rfa_gpio.rst_chip_line);
+    auto rst_line_b = gpio_b_rst_chip.get_line(kaonic::config::rfb_gpio.rst_chip_line);
+
+    auto irq_line_a = gpio_a_irq_chip.get_line(kaonic::config::rfa_gpio.irq_chip_line);
+    auto irq_line_b = gpio_b_irq_chip.get_line(kaonic::config::rfb_gpio.irq_chip_line);
+
+    if (!rst_line_a) {
+        log::error("[Server] Unable to get rst line A {}", kaonic::config::rfa_gpio.rst_chip_line);
         return -1;
     }
 
-    if (!reset_line2) {
-        log::error("[Server] Unable to get rst line 2 {}", kaonic::config::gpio2.rst_chip_line);
+    if (!rst_line_b) {
+        log::error("[Server] Unable to get rst line B {}", kaonic::config::rfb_gpio.rst_chip_line);
         return -1;
     }
 
-    if (!handle_line1) {
-        log::error("[Server] Unable to get handle line 1 {}", kaonic::config::gpio1.iqr_chip_line);
+    if (!irq_line_a) {
+        log::error("[Server] Unable to get IRQ line A {}", kaonic::config::rfa_gpio.irq_chip_line);
         return -1;
     }
 
-    if (!handle_line2) {
-        log::error("[Server] Unable to get handle line 2 {}", kaonic::config::gpio2.iqr_chip_line);
+    if (!irq_line_b) {
+        log::error("[Server] Unable to get IRQ line B {}", kaonic::config::rfb_gpio.irq_chip_line);
         return -1;
     }
 
-    reset_line1.request({ "kaonic", gpiod::line_request::DIRECTION_OUTPUT, 0 });
-    reset_line2.request({ "kaonic", gpiod::line_request::DIRECTION_OUTPUT, 0 });
+    rst_line_a.request({ "kaonic", gpiod::line_request::DIRECTION_OUTPUT, 0 });
+    rst_line_b.request({ "kaonic", gpiod::line_request::DIRECTION_OUTPUT, 0 });
 
-    handle_line1.request({ "kaonic", gpiod::line_request::DIRECTION_INPUT, 0 });
-    handle_line2.request({ "kaonic", gpiod::line_request::DIRECTION_INPUT, 0 });
+    irq_line_a.request({ "kaonic", gpiod::line_request::DIRECTION_INPUT, 0 });
+    irq_line_b.request({ "kaonic", gpiod::line_request::DIRECTION_INPUT, 0 });
 
-    if (!reset_line1.is_requested()) {
-        log::error("[Server] Unable to request reset line 1 on output");
+    if (!rst_line_a.is_requested()) {
+        log::error("[Server] Unable to request reset line A on output");
         return -1;
     }
 
-    if (!reset_line2.is_requested()) {
-        log::error("[Server] Unable to request reset line 2 on output");
+    if (!rst_line_b.is_requested()) {
+        log::error("[Server] Unable to request reset line B on output");
         return -1;
     }
 
-    if (!handle_line1.is_requested()) {
-        log::error("[Server] Unable to request handle line 1 on input");
+    if (!irq_line_a.is_requested()) {
+        log::error("[Server] Unable to request IRQ line A on input");
         return -1;
     }
 
-    if (!handle_line2.is_requested()) {
-        log::error("[Server] Unable to request handle line 2 on input");
+    if (!irq_line_b.is_requested()) {
+        log::error("[Server] Unable to request IRQ line B on input");
         return -1;
     }
 
-    radio_context1.reset_line = std::make_unique<gpiod::line>(std::move(reset_line1));
-    radio_context2.handle_line = std::make_unique<gpiod::line>(std::move(handle_line2));
+    radio_context_a.reset_line = std::make_unique<gpiod::line>(std::move(rst_line_a));
+    radio_context_b.handle_line = std::make_unique<gpiod::line>(std::move(rst_line_b));
 
-    radio_context1.reset_line = std::make_unique<gpiod::line>(std::move(reset_line1));
-    radio_context2.handle_line = std::make_unique<gpiod::line>(std::move(handle_line2));
+    radio_context_a.reset_line = std::make_unique<gpiod::line>(std::move(irq_line_a));
+    radio_context_b.handle_line = std::make_unique<gpiod::line>(std::move(irq_line_b));
 
-    auto radio1 = std::make_shared<comm::rf215_radio>(std::move(radio_context1));
-    if (auto err = radio1->init(); !err.is_ok()) {
+    auto radio_a = std::make_shared<comm::rf215_radio>(std::move(radio_context_a));
+    if (auto err = radio_a->init(); !err.is_ok()) {
         log::error("[Server] Unable to init the radio 1");
         return -1;
     }
 
-    auto radio2 = std::make_shared<comm::rf215_radio>(std::move(radio_context2));
-    if (auto err = radio2->init(); !err.is_ok()) {
+    auto radio_b = std::make_shared<comm::rf215_radio>(std::move(radio_context_b));
+    if (auto err = radio_b->init(); !err.is_ok()) {
         log::error("[Server] Unable to init the radio 2");
         return -1;
     }
 
-    std::vector<std::shared_ptr<comm::radio>> radios { radio1, radio2 };
+    std::vector<std::shared_ptr<comm::radio>> radios { radio_a, radio_b };
     auto radio_service = std::make_shared<comm::radio_service>(radios);
 
     comm::serial::config serial_config {
-        .tty_path = std::string { kaonic::config::serial_tty_path },
-        .baud_rate = kaonic::config::serial_baud_rate,
+        .tty_path = std::string { kaonic::config::KAONIC_SERIAL_TTY_PATH },
+        .baud_rate = kaonic::config::KAONIC_SERIAL_BAUD_RATE,
     };
     auto serial = std::make_shared<comm::serial::serial>();
 

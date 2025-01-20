@@ -37,29 +37,29 @@ auto serial::open(const config& config) -> error {
 
     std::lock_guard lock { _mut };
 
-    ::close(_comport_fd);
-    _comport_fd = ::open(config.tty_path.c_str(), O_RDWR);
-    if (_comport_fd == -1) {
+    ::close(_fd);
+    _fd = ::open(config.tty_path.c_str(), O_RDWR);
+    if (_fd == -1) {
         log::error("[Serial] Unable to open file descriptor");
         return error::fail();
     }
 
     termios uart_options { 0 };
-    if (tcgetattr(_comport_fd, &uart_options)) {
+    if (tcgetattr(_fd, &uart_options)) {
         log::error("[Serial] Unable to put the state of FD into termios options ");
-        ::close(_comport_fd);
+        ::close(_fd);
         return error::fail();
     }
 
     if (auto err = cfsetispeed(&uart_options, baudrate_itr->second); err != 0) {
         log::error("[Serial] Unable to set cfsetispeed parameter: {}", strerror(errno));
-        ::close(_comport_fd);
+        ::close(_fd);
         return error::fail();
     }
 
     if (auto err = cfsetospeed(&uart_options, baudrate_itr->second); err != 0) {
         log::error("[Serial] Unable to set cfsetospeed parameter: {}", strerror(errno));
-        ::close(_comport_fd);
+        ::close(_fd);
         return error::fail();
     }
 
@@ -85,17 +85,17 @@ auto serial::open(const config& config) -> error {
     uart_options.c_cc[VTIME] = 10;
     uart_options.c_cc[VMIN] = 0;
 
-    if (auto err = tcflush(_comport_fd, TCIFLUSH); err != 0) {
+    if (auto err = tcflush(_fd, TCIFLUSH); err != 0) {
         log::error("[Serial] Unable to flush pending data on file descriptor: {}", strerror(errno));
-        ::close(_comport_fd);
+        ::close(_fd);
         return error::fail();
     }
 
-    if (auto err = tcsetattr(_comport_fd, TCSANOW, &uart_options); err != 0) {
+    if (auto err = tcsetattr(_fd, TCSANOW, &uart_options); err != 0) {
         log::error("[Serial] Unable to set the state of file descriptor to termios "
                    "options: {}",
                    strerror(errno));
-        ::close(_comport_fd);
+        ::close(_fd);
         return error::fail();
     }
 
@@ -114,9 +114,9 @@ auto serial::read(uint8_t* data, size_t length, std::chrono::milliseconds timeou
 
     fd_set monitor_fd;
     FD_ZERO(&monitor_fd);
-    FD_SET(_comport_fd, &monitor_fd);
+    FD_SET(_fd, &monitor_fd);
 
-    auto selected_fd = ::select(_comport_fd + 1, &monitor_fd, nullptr, nullptr, &time);
+    auto selected_fd = ::select(_fd + 1, &monitor_fd, nullptr, nullptr, &time);
     if (selected_fd == 0) {
         return 0;
     }
@@ -126,7 +126,7 @@ auto serial::read(uint8_t* data, size_t length, std::chrono::milliseconds timeou
         return -1;
     }
 
-    if (bytes_read = ::read(_comport_fd, data, length); bytes_read < 0) {
+    if (bytes_read = ::read(_fd, data, length); bytes_read < 0) {
         log::error("[Serial] Read error - {}", strerror(errno));
     }
 
@@ -138,9 +138,9 @@ auto serial::write(const uint8_t* data, size_t length) -> size_t {
 
     std::lock_guard lk { _mut };
 
-    if (bytes_writen = ::write(_comport_fd, data, length); bytes_writen < 0) {
+    if (bytes_writen = ::write(_fd, data, length); bytes_writen < 0) {
         log::error("[Serial] Write error - {}", strerror(errno));
-        tcflush(_comport_fd, TCOFLUSH);
+        tcflush(_fd, TCOFLUSH);
     }
 
     return bytes_writen;
@@ -149,7 +149,7 @@ auto serial::write(const uint8_t* data, size_t length) -> size_t {
 auto serial::close() noexcept -> void {
     std::lock_guard lk { _mut };
 
-    ::close(_comport_fd);
+    ::close(_fd);
 }
 
 } // namespace kaonic::comm::serial

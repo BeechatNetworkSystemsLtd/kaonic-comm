@@ -36,7 +36,7 @@ public:
     serial& operator=(serial&&) = delete;
 
 private:
-    int _comport_fd;
+    int _fd;
 
     mutable std::mutex _mut;
 };

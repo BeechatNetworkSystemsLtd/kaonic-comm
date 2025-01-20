@@ -6,7 +6,9 @@ namespace kaonic::comm::mesh {
 
 auto network_broadcast_receiver::attach_listener(
     const std::shared_ptr<network_receiver>& listener) noexcept -> void {
-    _listeners.push_back(listener);
+    if (listener) {
+        _listeners.push_back(listener);
+    }
 }
 
 auto network_broadcast_receiver::on_receive(const frame& frame) -> void {

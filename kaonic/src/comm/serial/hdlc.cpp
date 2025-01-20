@@ -4,6 +4,8 @@ namespace kaonic::comm::serial {
 
 auto hdlc::escape(const hdlc_data_t& data, hdlc_data_t& output) noexcept -> void {
     output.clear();
+
+    output.reserve(data.size() + 2);
     output.push_back(hdlc::flag);
 
     for (auto byte : data) {

@@ -1,0 +1,49 @@
+#pragma once
+
+#include <string_view>
+
+namespace kaonic::config {
+    struct spi_config final {
+        std::string_view device_path;
+        size_t speed;
+        size_t mode;
+        size_t bpw;
+    };
+
+    struct gpio_config final {
+        std::string_view chip_name;
+        size_t rst_chip_line;
+        size_t iqr_chip_line;
+    };
+
+    constexpr gpio_config gpio1 {
+        .chip_name = "@GPIO1_CHIP@",
+        .rst_chip_line = @GPIO1_RST_LINE@,
+        .iqr_chip_line = @GPIO1_IRQ_LINE@,
+    };
+
+    constexpr gpio_config gpio2 {
+        .chip_name = "@GPIO2_CHIP@",
+        .rst_chip_line = @GPIO2_RST_LINE@,
+        .iqr_chip_line = @GPIO2_IRQ_LINE@,
+    };
+
+    constexpr spi_config spi1 {
+        .device_path = "@SPI1_DEVICE_PATH@",
+        .speed = @SPI1_SPEED@,
+        .mode = @SPI1_MODE@,
+        .bpw = @SPI1_BPW@,
+    };
+
+    constexpr spi_config spi2 {
+        .device_path = "@SPI2_DEVICE_PATH@",
+        .speed = @SPI2_SPEED@,
+        .mode = @SPI2_MODE@,
+        .bpw = @SPI2_BPW@,
+    };
+
+    constexpr std::string_view serial_tty_path = "@SERIAL_TTY_PATH@";
+    constexpr size_t serial_bound_rate = @SERIAL_BOUND_RATE@;
+
+    constexpr std::string_view server_url = "@SERVER_ADDR@:@SERVER_PORT@";
+}

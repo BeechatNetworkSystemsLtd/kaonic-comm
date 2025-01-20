@@ -91,7 +91,7 @@ auto rf215_radio::receive(radio_frame& frame, const std::chrono::milliseconds& t
             _active_trx, static_cast<rf215_millis_t>(timeout.count()), &rf_frame);
         err != 0) {
         log::error("[RF215 Radio] Unable to rf215_baseband_rx_frame");
-        return error::fail();
+        return error::timeout();
     }
 
     memcpy(frame.data, rf_frame.data, rf_frame.len);

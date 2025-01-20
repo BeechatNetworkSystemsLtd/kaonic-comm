@@ -15,7 +15,6 @@ auto network_broadcast_receiver::on_receive(const frame& frame) -> void {
 
         if (!listener) {
             log::error("[Radio Broadcaster] Listener is not initialized");
-            return;
         }
 
         listener->on_receive(frame);

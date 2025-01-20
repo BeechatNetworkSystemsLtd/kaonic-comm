@@ -31,7 +31,6 @@ auto main(int argc, char** argv) noexcept -> int {
     while (reciever->Read(&response)) {
         const auto& frame = response.frame();
         log::info("[Client] Recieved frame length: {}", frame.length());
-        log::info("[Client] Recieved frame crc32: {}", frame.crc32());
         log::info("[Client] Recieved frame buffer elements: ");
         auto bytes_ptr = reinterpret_cast<const uint8_t*>(frame.data().begin());
         for (size_t i = 0; i < frame.length(); ++i) {

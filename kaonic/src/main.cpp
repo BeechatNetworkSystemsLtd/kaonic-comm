@@ -134,7 +134,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     comm::serial::config serial_config {
         .tty_path = std::string { kaonic::config::serial_tty_path },
-        .bound_rate = kaonic::config::serial_bound_rate,
+        .baud_rate = kaonic::config::serial_baud_rate,
     };
     auto serial = std::make_shared<comm::serial::serial>();
 

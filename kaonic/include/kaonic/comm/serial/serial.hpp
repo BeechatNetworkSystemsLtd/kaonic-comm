@@ -11,7 +11,7 @@ namespace kaonic::comm::serial {
 
 struct config final {
     std::filesystem::path tty_path;
-    uint32_t bound_rate;
+    uint32_t baud_rate;
 };
 
 class serial {

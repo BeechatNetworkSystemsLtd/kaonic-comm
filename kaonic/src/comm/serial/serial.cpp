@@ -10,7 +10,7 @@
 
 namespace kaonic::comm::serial {
 
-constexpr static std::array<std::pair<uint32_t, uint32_t>, 22> supported_boundrates = { {
+constexpr static std::array<std::pair<uint32_t, uint32_t>, 22> supported_baudrates = { {
     { 110, B110 },         { 150, B150 },         { 300, B300 },         { 1200, B1200 },
     { 2400, B2400 },       { 4800, B4800 },       { 9600, B9600 },       { 19200, B19200 },
     { 38400, B38400 },     { 57600, B57600 },     { 115200, B115200 },   { 230400, B230400 },
@@ -25,13 +25,13 @@ auto serial::open(const config& config) -> error {
         return error::invalid_arg();
     }
 
-    const auto boundrate_itr =
-        std::find_if(supported_boundrates.begin(),
-                     supported_boundrates.end(),
-                     [&](const auto& elem) { return config.bound_rate == std::get<0>(elem); });
+    const auto baudrate_itr =
+        std::find_if(supported_baudrates.begin(), supported_baudrates.end(), [&](const auto& elem) {
+            return config.baud_rate == std::get<0>(elem);
+        });
 
-    if (boundrate_itr == supported_boundrates.end()) {
-        log::error("[Serial] Boundrate {} is not supported", config.bound_rate);
+    if (baudrate_itr == supported_baudrates.end()) {
+        log::error("[Serial] Baud rate {} is not supported", config.baud_rate);
         return error::invalid_arg();
     }
 
@@ -51,13 +51,13 @@ auto serial::open(const config& config) -> error {
         return error::fail();
     }
 
-    if (auto err = cfsetispeed(&uart_options, boundrate_itr->second); err != 0) {
+    if (auto err = cfsetispeed(&uart_options, baudrate_itr->second); err != 0) {
         log::error("[Serial] Unable to set cfsetispeed parameter: {}", strerror(errno));
         ::close(_comport_fd);
         return error::fail();
     }
 
-    if (auto err = cfsetospeed(&uart_options, boundrate_itr->second); err != 0) {
+    if (auto err = cfsetospeed(&uart_options, baudrate_itr->second); err != 0) {
         log::error("[Serial] Unable to set cfsetospeed parameter: {}", strerror(errno));
         ::close(_comport_fd);
         return error::fail();
@@ -99,8 +99,7 @@ auto serial::open(const config& config) -> error {
         return error::fail();
     }
 
-    log::info(
-        "[Serial] Open '{}' device, baudrate: {}", config.tty_path.c_str(), config.bound_rate);
+    log::info("[Serial] Open '{}' device, baudrate: {}", config.tty_path.c_str(), config.baud_rate);
 
     return error::ok();
 }

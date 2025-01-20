@@ -1,5 +1,6 @@
 #include "kaonic/comm/drivers/spi.hpp"
 
+#include <endian.h>
 #include <fcntl.h>
 #include <linux/spi/spidev.h>
 #include <sys/ioctl.h>
@@ -37,55 +38,51 @@ auto spi::open(const spi_config& config) -> error {
     return error::ok();
 }
 
-auto spi::read_buffer(const uint8_t addr, uint8_t* buffer, size_t length) -> error {
+auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> error {
     if (!buffer || length == 0) {
         log::error("[SPI] Invalid buffer or length for read_buffer.");
         return error::invalid_arg();
     }
 
-    uint8_t tx_buffer[length + 1];
-    uint8_t rx_buffer[length + 1];
+    const auto write_reg = htobe16(addr);
 
-    tx_buffer[0] = addr | 0x80; // Set MSB to indicate read operation
-    std::fill(tx_buffer + 1, tx_buffer + length + 1, 0x00);
+    struct spi_ioc_transfer transfers[2] = {};
 
-    struct spi_ioc_transfer xfer = { 0 };
-    xfer.tx_buf = (__u64)tx_buffer;
-    xfer.rx_buf = (__u64)rx_buffer;
-    xfer.len = (__u32)(length + 1);
+    transfers[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
+    transfers[0].rx_buf = 0;
+    transfers[0].len = sizeof(write_reg);
 
-    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(1), &xfer);
+    transfers[1].tx_buf = 0;
+    transfers[1].rx_buf = reinterpret_cast<__u64>(buffer);
+    transfers[1].len = length;
+
+    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), transfers);
     if (retv < 0) {
         log::error("[SPI] Error {} from ioctl (read buffer): {}", errno, strerror(errno));
         return error::fail();
     }
 
-    for (size_t i = 0; i < length; ++i) {
-        buffer[i] = rx_buffer[i + 1];
-    }
-
     return error::ok();
 }
 
-auto spi::write_buffer(const uint8_t addr, const uint8_t* buffer, size_t length) -> error {
+auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length) -> error {
     if (!buffer || length == 0) {
-        log::error("[SPI] Invalid buffer or length for write_buffer.");
+        log::error("[SPI] Invalid buffer or length for read_buffer.");
         return error::invalid_arg();
     }
 
-    uint8_t tx_buffer[length + 1];
+    const auto write_reg = htobe16(addr);
+    _tx_buffer.resize(sizeof(write_reg) + length);
 
-    tx_buffer[0] = addr & 0x7F; // Clear MSB to indicate write operation
-    for (size_t i = 0; i < length; ++i) {
-        tx_buffer[i + 1] = buffer[i];
-    }
+    memcpy(_tx_buffer.data(), &write_reg, sizeof(write_reg));
+    memcpy(_tx_buffer.data() + sizeof(write_reg), buffer, length);
 
-    struct spi_ioc_transfer xfer = { 0 };
-    xfer.tx_buf = (__u64)tx_buffer;
-    xfer.rx_buf = 0;
-    xfer.len = (__u32)(length + 1);
+    struct spi_ioc_transfer transfer = { 0 };
+    transfer.tx_buf = reinterpret_cast<__u64>(_tx_buffer.data());
+    transfer.rx_buf = 0;
+    transfer.len = _tx_buffer.size();
 
-    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(1), &xfer);
+    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(1), &transfer);
     if (retv < 0) {
         log::error("[SPI] Error {} from ioctl (write buffer): {}", errno, strerror(errno));
         return error::fail();

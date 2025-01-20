@@ -8,7 +8,8 @@ using namespace std::chrono_literals;
 
 namespace kaonic::comm {
 
-radio_service::radio_service(const std::vector<std::shared_ptr<radio>>& radios) noexcept
+radio_service::radio_service(const mesh::config& config,
+                             const std::vector<std::shared_ptr<radio>>& radios) noexcept
     : _radios { radios }
     , _radio_broadcasters { _radios.size(), std::make_shared<mesh::network_broadcast_receiver>() } {
     for (size_t i = 0; i < _radios.size(); ++i) {

@@ -10,7 +10,8 @@ namespace kaonic::comm {
 class radio_service {
 
 public:
-    explicit radio_service(const std::vector<std::shared_ptr<radio>>& radios) noexcept;
+    explicit radio_service(const mesh::config& config,
+                           const std::vector<std::shared_ptr<radio>>& radios) noexcept;
 
     [[nodiscard]] auto configure(uint8_t module, const radio_config& config) -> error;
 

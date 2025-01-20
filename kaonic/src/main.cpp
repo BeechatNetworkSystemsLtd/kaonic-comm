@@ -17,6 +17,7 @@
 #include <grpcpp/server_builder.h>
 
 using namespace kaonic;
+using namespace std::chrono_literals;
 
 auto main(int argc, char** argv) noexcept -> int {
     log::info("[Server] Start comm server with FW version {}", kaonic::info::version);
@@ -136,7 +137,14 @@ auto main(int argc, char** argv) noexcept -> int {
     }
 
     std::vector<std::shared_ptr<comm::radio>> radios { radio_a, radio_b };
-    auto radio_service = std::make_shared<comm::radio_service>(radios);
+
+    const comm::mesh::config mesh_config {
+        .packet_pattern = 0x77,
+        .slot_duration = 50ms,
+        .gap_duration = 5ms,
+        .beacon_interval = 100ms,
+    };
+    auto radio_service = std::make_shared<comm::radio_service>(mesh_config, radios);
 
     comm::serial::config serial_config {
         .tty_path = std::string { kaonic::config::KAONIC_SERIAL_TTY_PATH },

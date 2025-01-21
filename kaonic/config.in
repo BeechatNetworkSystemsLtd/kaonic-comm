@@ -1,0 +1,52 @@
+#pragma once
+
+#include <string_view>
+
+namespace kaonic::config {
+    struct spi_config final {
+        std::string_view device_path;
+        size_t speed;
+        size_t mode;
+        size_t bpw;
+    };
+
+    struct gpio_config final {
+        std::string_view rst_chip_name;
+        size_t rst_chip_line;
+        std::string_view irq_chip_name;
+        size_t irq_chip_line;
+    };
+
+    constexpr gpio_config rfa_gpio {
+        .rst_chip_name = "@KAONIC_RFA_GPIO_RST_CHIP@",
+        .rst_chip_line = @KAONIC_RFA_GPIO_RST_LINE@,
+        .irq_chip_name = "@KAONIC_RFA_GPIO_IRQ_CHIP@",
+        .irq_chip_line = @KAONIC_RFA_GPIO_IRQ_LINE@,
+    };
+
+    constexpr gpio_config rfb_gpio {
+        .rst_chip_name = "@KAONIC_RFB_GPIO_RST_CHIP@",
+        .rst_chip_line = @KAONIC_RFB_GPIO_RST_LINE@,
+        .irq_chip_name = "@KAONIC_RFB_GPIO_IRQ_CHIP@",
+        .irq_chip_line = @KAONIC_RFB_GPIO_IRQ_LINE@,
+    };
+
+    constexpr spi_config rfa_spi {
+        .device_path = "@KAONIC_RFA_SPI_PATH@",
+        .speed = @KAONIC_RFA_SPI_SPEED@,
+        .mode = @KAONIC_RFA_SPI_MODE@,
+        .bpw = @KAONIC_RFA_SPI_BPW@,
+    };
+
+    constexpr spi_config rfb_spi {
+        .device_path = "@KAONIC_RFB_SPI_PATH@",
+        .speed = @KAONIC_RFB_SPI_SPEED@,
+        .mode = @KAONIC_RFB_SPI_MODE@,
+        .bpw = @KAONIC_RFB_SPI_BPW@,
+    };
+
+    constexpr std::string_view KAONIC_SERIAL_TTY_PATH = "@KAONIC_SERIAL_TTY_PATH@";
+    constexpr size_t KAONIC_SERIAL_BAUD_RATE = @KAONIC_SERIAL_BAUD_RATE@;
+
+    constexpr std::string_view server_url = "@KAONIC_SERVER_ADDR@:@KAONIC_SERVER_PORT@";
+}

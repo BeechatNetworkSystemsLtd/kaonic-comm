@@ -39,8 +39,6 @@ protected:
 
 private:
     int _device_fd;
-
-    std::vector<uint8_t> _tx_buffer;
 };
 
 } // namespace kaonic::drivers

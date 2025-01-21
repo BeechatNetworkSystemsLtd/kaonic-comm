@@ -72,17 +72,18 @@ auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length
     }
 
     const auto write_reg = htobe16(addr);
-    _tx_buffer.resize(sizeof(write_reg) + length);
 
-    memcpy(_tx_buffer.data(), &write_reg, sizeof(write_reg));
-    memcpy(_tx_buffer.data() + sizeof(write_reg), buffer, length);
+    struct spi_ioc_transfer transfers[2] = {};
 
-    struct spi_ioc_transfer transfer = { 0 };
-    transfer.tx_buf = reinterpret_cast<__u64>(_tx_buffer.data());
-    transfer.rx_buf = 0;
-    transfer.len = _tx_buffer.size();
+    transfers[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
+    transfers[0].rx_buf = 0;
+    transfers[0].len = sizeof(write_reg);
 
-    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(1), &transfer);
+    transfers[1].tx_buf = reinterpret_cast<__u64>(buffer);
+    transfers[1].rx_buf = 0;
+    transfers[1].len = length;
+
+    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), transfers);
     if (retv < 0) {
         log::error("[SPI] Error {} from ioctl (write buffer): {}", errno, strerror(errno));
         return error::fail();

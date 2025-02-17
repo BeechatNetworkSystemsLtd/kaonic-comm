@@ -1,3 +1,9 @@
 [submodule "extern/spdlog"]
 	path = extern/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "extern/rf215"]
+	path = extern/rf215
+	url = git@github.com:BeechatNetworkSystemsLtd/kaonic-rf215.git
+[submodule "extern/rfnet"]
+	path = extern/rfnet
+	url = git@github.com:BeechatNetworkSystemsLtd/kaonic-rfnet.git

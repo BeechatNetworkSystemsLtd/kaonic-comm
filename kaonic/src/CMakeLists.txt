@@ -5,8 +5,6 @@ target_include_directories(
 
     PUBLIC
         ../include
-        ../../extern/rfnet
-        ../../extern/rf215
 )
 
 target_sources(
@@ -28,13 +26,6 @@ target_sources(
         comm/services/radio_service.cpp
         comm/services/grpc_service.cpp
         comm/services/serial_service.cpp
-
-        ../../extern/rfnet/rfnet.c
-
-        ../../extern/rf215/rf215_regs.c
-        ../../extern/rf215/rf215_baseband.c
-        ../../extern/rf215/rf215_mod.c
-        ../../extern/rf215/rf215.c
 )
 
 target_link_libraries(
@@ -47,6 +38,8 @@ target_link_libraries(
     PUBLIC
         spdlog::spdlog
         kaonic_proto
+        drivers_rf215
+        modules_rfnet
 )
 
 add_executable(server)

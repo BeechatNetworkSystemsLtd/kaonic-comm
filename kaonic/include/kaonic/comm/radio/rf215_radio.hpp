@@ -10,7 +10,7 @@
 #include "kaonic/comm/radio/radio.hpp"
 
 extern "C" {
-#include "rf215.h"
+#include "rf215/rf215.h"
 }
 
 namespace kaonic::comm {

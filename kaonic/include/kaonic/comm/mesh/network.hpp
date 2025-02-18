@@ -8,7 +8,7 @@
 #include <vector>
 
 extern "C" {
-#include "rfnet.h"
+#include "rfnet/rfnet.h"
 }
 
 #include "kaonic/comm/mesh/network_interface.hpp"

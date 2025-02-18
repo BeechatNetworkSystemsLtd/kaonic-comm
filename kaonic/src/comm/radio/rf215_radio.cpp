@@ -5,7 +5,7 @@
 #include "kaonic/common/logging.hpp"
 
 extern "C" {
-#include "rf215_baseband.h"
+#include "rf215/rf215_baseband.h"
 }
 
 using namespace std::chrono_literals;

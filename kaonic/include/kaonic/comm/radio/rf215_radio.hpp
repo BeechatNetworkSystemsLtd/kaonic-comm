@@ -17,8 +17,14 @@ namespace kaonic::comm {
 
 struct radio_context {
     std::unique_ptr<drivers::spi> spi;
-    std::unique_ptr<gpiod::line> reset_line;
-    std::unique_ptr<gpiod::line> handle_line;
+
+    std::string name;
+
+    std::string_view rst_gpio_chip;
+    gpiod::line::offset rst_gpio;
+
+    std::string_view irq_gpio_chip;
+    gpiod::line::offset irq_gpio;
 };
 
 class rf215_radio final : public radio {
@@ -61,6 +67,9 @@ protected:
 
 private:
     radio_context _context;
+
+    std::unique_ptr<gpiod::line_request> _rst_gpio_req;
+    std::unique_ptr<gpiod::line_request> _irq_gpio_req;
 
     rf215_device _dev;
     rf215_trx* _active_trx = nullptr;

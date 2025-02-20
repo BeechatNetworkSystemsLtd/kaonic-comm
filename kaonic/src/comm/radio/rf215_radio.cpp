@@ -16,6 +16,7 @@ constexpr static uint32_t freq_offset = 1500000000u;
 
 rf215_radio::rf215_radio(radio_context&& context) noexcept
     : _context { std::move(context) } {
+
     _dev.iface = rf215_iface {
         .ctx = this,
         .write = write,
@@ -28,6 +29,38 @@ rf215_radio::rf215_radio(radio_context&& context) noexcept
 }
 
 auto rf215_radio::init() -> error {
+
+    _rst_gpio_req = std::make_unique<gpiod::line_request>(
+        gpiod::chip(_context.rst_gpio_chip)
+            .prepare_request()
+            .set_consumer(_context.name + "-rst")
+            .add_line_settings(_context.rst_gpio,
+                               gpiod::line_settings()
+                                   .set_direction(gpiod::line::direction::OUTPUT)
+                                   .set_active_low(true)
+                                   .set_output_value(gpiod::line::value::INACTIVE))
+            .do_request());
+
+    if (!(*_rst_gpio_req)) {
+        log::error("rf215: can't request rst gpio");
+        return error::fail();
+    }
+
+    _irq_gpio_req = std::make_unique<gpiod::line_request>(
+        gpiod::chip(_context.irq_gpio_chip)
+            .prepare_request()
+            .set_consumer(_context.name + "-irq")
+            .add_line_settings(_context.irq_gpio,
+                               gpiod::line_settings()
+                                   .set_direction(gpiod::line::direction::INPUT)
+                                   .set_edge_detection(gpiod::line::edge::FALLING))
+            .do_request());
+
+    if (!*(_irq_gpio_req)) {
+        log::error("rf215: can't request rst gpio");
+        return error::fail();
+    }
+
     if (auto err = rf215_init(&_dev); err != 0) {
         log::error("[RF215 Radio] Unable to init the radio");
         return error::fail();
@@ -125,7 +158,7 @@ auto rf215_radio::wait_irq(const void* ctx, rf215_millis_t timeout, rf215_irq_da
 
     const auto& context = self._context;
 
-    const auto has_irq = context.handle_line->event_wait(std::chrono::milliseconds(timeout));
+    const auto has_irq = self._irq_gpio_req->wait_edge_events(std::chrono::milliseconds(timeout));
     if (has_irq) {
         auto irq_data_ptr = reinterpret_cast<uint8_t*>(irq);
         if (auto err = context.spi->read_buffer(0x0000, irq_data_ptr, 4); !err.is_ok()) {
@@ -145,9 +178,11 @@ auto rf215_radio::current_time(const void* ctx) noexcept -> rf215_millis_t {
 
 auto rf215_radio::reset(const void* ctx) noexcept -> void {
     auto& self = *reinterpret_cast<const rf215_radio*>(ctx);
-    self._context.reset_line->set_value(1);
+
+    self._rst_gpio_req->set_value(self._context.rst_gpio, gpiod::line::value::ACTIVE);
     std::this_thread::sleep_for(25ms);
-    self._context.reset_line->set_value(0);
+
+    self._rst_gpio_req->set_value(self._context.rst_gpio, gpiod::line::value::INACTIVE);
     std::this_thread::sleep_for(25ms);
 }
 

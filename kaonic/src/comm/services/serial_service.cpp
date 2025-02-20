@@ -28,7 +28,7 @@ static auto buf_unpack(const std::vector<uint8_t>& src, RadioFrame& dst) -> void
     size_t dst_size = src.size() / sizeof(uint32_t);
     dst_size += (src.size() - dst_size * sizeof(uint32_t)) ? 1 : 0;
     data->Resize(dst_size, 0);
-    std::memcpy(data->begin(), src.data(), src.size());
+    std::memcpy(data->mutable_data(), src.data(), src.size());
 
     dst.set_length(src.size());
 }

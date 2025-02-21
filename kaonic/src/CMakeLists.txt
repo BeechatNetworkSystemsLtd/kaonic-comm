@@ -42,20 +42,23 @@ target_link_libraries(
         modules_rfnet
 )
 
-add_executable(server)
+add_executable(kaonic_commd)
 
 target_sources(
-    server
+    kaonic_commd
 
     PRIVATE
         main.cpp
 )
 
 target_link_libraries(
-    server
+    kaonic_commd
 
     PRIVATE
         kaonic
 )
 
-install(TARGETS server DESTINATION bin)
+set_target_properties(kaonic_commd PROPERTIES OUTPUT_NAME "kaonic-commd")
+
+install(TARGETS kaonic_commd DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+

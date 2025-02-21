@@ -60,5 +60,5 @@ target_link_libraries(
 
 set_target_properties(kaonic_commd PROPERTIES OUTPUT_NAME "kaonic-commd")
 
-install(TARGETS kaonic_commd DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS kaonic_commd DESTINATION bin)
 

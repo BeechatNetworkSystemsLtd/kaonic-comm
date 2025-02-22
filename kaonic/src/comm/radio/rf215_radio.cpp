@@ -65,6 +65,10 @@ auto rf215_radio::init() -> error {
         log::error("[RF215 Radio] Unable to init the radio");
         return error::fail();
     }
+
+    const auto rf215_pn = rf215_probe(&_dev);
+    log::info("[RF215 Radio] Detected '{:08x}' RF215 PartNumber", (int)rf215_pn);
+
     return error::ok();
 }
 
@@ -177,6 +181,7 @@ auto rf215_radio::current_time(const void* ctx) noexcept -> rf215_millis_t {
 }
 
 auto rf215_radio::reset(const void* ctx) noexcept -> void {
+    log::debug("rf215_radio: reset");
     auto& self = *reinterpret_cast<const rf215_radio*>(ctx);
 
     self._rst_gpio_req->set_value(self._context.rst_gpio, gpiod::line::value::ACTIVE);

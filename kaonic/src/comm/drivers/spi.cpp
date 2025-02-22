@@ -46,17 +46,22 @@ auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> er
 
     const auto write_reg = htobe16(addr);
 
-    struct spi_ioc_transfer transfers[2] = {};
+    struct spi_ioc_transfer xfer[2];
+    memset(xfer, 0x00, sizeof(xfer));
 
-    transfers[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
-    transfers[0].rx_buf = 0;
-    transfers[0].len = sizeof(write_reg);
+    xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
+    xfer[0].rx_buf = 0;
+    xfer[0].len = sizeof(write_reg);
+    xfer[0].speed_hz = 25000000;
+    xfer[0].bits_per_word = 8;
 
-    transfers[1].tx_buf = 0;
-    transfers[1].rx_buf = reinterpret_cast<__u64>(buffer);
-    transfers[1].len = length;
+    xfer[1].tx_buf = 0;
+    xfer[1].rx_buf = reinterpret_cast<__u64>(buffer);
+    xfer[1].len = length;
+    xfer[1].speed_hz = 25000000;
+    xfer[1].bits_per_word = 8;
 
-    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), transfers);
+    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), xfer);
     if (retv < 0) {
         log::error("[SPI] Error {} from ioctl (read buffer): {}", errno, strerror(errno));
         return error::fail();
@@ -73,17 +78,22 @@ auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length
 
     const auto write_reg = htobe16(addr);
 
-    struct spi_ioc_transfer transfers[2] = {};
+    struct spi_ioc_transfer xfer[2];
+    memset(xfer, 0x00, sizeof(xfer));
 
-    transfers[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
-    transfers[0].rx_buf = 0;
-    transfers[0].len = sizeof(write_reg);
+    xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
+    xfer[0].rx_buf = 0;
+    xfer[0].len = sizeof(write_reg);
+    xfer[0].speed_hz = 25000000;
+    xfer[0].bits_per_word = 8;
 
-    transfers[1].tx_buf = reinterpret_cast<__u64>(buffer);
-    transfers[1].rx_buf = 0;
-    transfers[1].len = length;
+    xfer[1].tx_buf = reinterpret_cast<__u64>(buffer);
+    xfer[1].rx_buf = 0;
+    xfer[1].len = length;
+    xfer[1].speed_hz = 25000000;
+    xfer[1].bits_per_word = 8;
 
-    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), transfers);
+    int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), xfer);
     if (retv < 0) {
         log::error("[SPI] Error {} from ioctl (write buffer): {}", errno, strerror(errno));
         return error::fail();

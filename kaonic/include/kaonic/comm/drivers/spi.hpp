@@ -9,10 +9,10 @@
 namespace kaonic::drivers {
 
 struct spi_config final {
-    std::string device_path;
-    uint32_t speed;
-    uint8_t mode;
-    uint8_t bits_per_word;
+    std::string_view dev;
+    uint32_t speed = 1000000;
+    uint8_t mode = 0;
+    uint8_t bits_per_word = 8;
 };
 
 class spi final {
@@ -39,6 +39,7 @@ protected:
 
 private:
     int _device_fd;
+    spi_config _config;
 };
 
 } // namespace kaonic::drivers

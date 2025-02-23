@@ -3,11 +3,12 @@
 #include <memory>
 #include <mutex>
 
-#include <gpiod.hpp>
-
+#include "kaonic/comm/drivers/gpio.hpp"
 #include "kaonic/comm/drivers/spi.hpp"
 #include "kaonic/comm/mesh/network_interface.hpp"
 #include "kaonic/comm/radio/radio.hpp"
+
+#include <gpiod.hpp>
 
 extern "C" {
 #include "rf215/rf215.h"
@@ -15,22 +16,23 @@ extern "C" {
 
 namespace kaonic::comm {
 
-struct radio_context {
-    std::unique_ptr<drivers::spi> spi;
+struct rf215_radio_config {
 
     std::string name;
 
-    std::string_view rst_gpio_chip;
-    gpiod::line::offset rst_gpio;
+    drivers::spi_config spi;
 
-    std::string_view irq_gpio_chip;
-    gpiod::line::offset irq_gpio;
+    drivers::gpio_spec rst_gpio;
+    drivers::gpio_spec irq_gpio;
+    drivers::gpio_spec flt_sel_v1_gpio;
+    drivers::gpio_spec flt_sel_v2_gpio;
+    drivers::gpio_spec flt_sel_24_gpio;
 };
 
 class rf215_radio final : public radio {
 
 public:
-    explicit rf215_radio(radio_context&& context) noexcept;
+    explicit rf215_radio(const rf215_radio_config& config) noexcept;
     ~rf215_radio() = default;
 
     [[nodiscard]] auto init() -> error;
@@ -66,10 +68,14 @@ protected:
     rf215_radio& operator=(rf215_radio&&) = delete;
 
 private:
-    radio_context _context;
+    rf215_radio_config _config;
 
+    std::unique_ptr<drivers::spi> _spi;
     std::unique_ptr<gpiod::line_request> _rst_gpio_req;
     std::unique_ptr<gpiod::line_request> _irq_gpio_req;
+    std::unique_ptr<gpiod::line_request> _flt_sel_v1_gpio_req;
+    std::unique_ptr<gpiod::line_request> _flt_sel_v2_gpio_req;
+    std::unique_ptr<gpiod::line_request> _flt_sel_24_gpio_req;
 
     rf215_device _dev;
     rf215_trx* _active_trx = nullptr;

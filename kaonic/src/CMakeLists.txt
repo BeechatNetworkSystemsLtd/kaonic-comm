@@ -11,9 +11,9 @@ target_sources(
     kaonic
 
     PRIVATE
-        comm/radio/rf215_radio.cpp
-
         comm/drivers/spi.cpp
+
+        comm/radio/rf215_radio.cpp
 
         comm/serial/serial.cpp
         comm/serial/hdlc.cpp

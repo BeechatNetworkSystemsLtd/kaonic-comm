@@ -11,7 +11,10 @@
 namespace kaonic::drivers {
 
 auto spi::open(const spi_config& config) -> error {
-    _device_fd = ::open(config.device_path.c_str(), O_RDWR);
+
+    log::debug("spi: open '{}' device", config.dev);
+
+    _device_fd = ::open(config.dev.data(), O_RDWR);
     if (_device_fd < 0) {
         log::error("[SPI] Error {} from open: {}", errno, strerror(errno));
         return error::fail();
@@ -35,12 +38,15 @@ auto spi::open(const spi_config& config) -> error {
         return error::fail();
     }
 
+    _config = config;
+
     return error::ok();
 }
 
 auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> error {
+
     if (!buffer || length == 0) {
-        log::error("[SPI] Invalid buffer or length for read_buffer.");
+        log::error("spi: invalid buffer or length for read op");
         return error::invalid_arg();
     }
 
@@ -52,14 +58,14 @@ auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> er
     xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
     xfer[0].rx_buf = 0;
     xfer[0].len = sizeof(write_reg);
-    xfer[0].speed_hz = 25000000;
-    xfer[0].bits_per_word = 8;
+    xfer[0].speed_hz = _config.speed;
+    xfer[0].bits_per_word = _config.bits_per_word;
 
     xfer[1].tx_buf = 0;
     xfer[1].rx_buf = reinterpret_cast<__u64>(buffer);
     xfer[1].len = length;
-    xfer[1].speed_hz = 25000000;
-    xfer[1].bits_per_word = 8;
+    xfer[1].speed_hz = _config.speed;
+    xfer[1].bits_per_word = _config.bits_per_word;
 
     int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), xfer);
     if (retv < 0) {
@@ -71,8 +77,9 @@ auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> er
 }
 
 auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length) -> error {
+
     if (!buffer || length == 0) {
-        log::error("[SPI] Invalid buffer or length for read_buffer.");
+        log::error("spi: invalid buffer or length for write op");
         return error::invalid_arg();
     }
 
@@ -84,14 +91,14 @@ auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length
     xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
     xfer[0].rx_buf = 0;
     xfer[0].len = sizeof(write_reg);
-    xfer[0].speed_hz = 25000000;
-    xfer[0].bits_per_word = 8;
+    xfer[0].speed_hz = _config.speed;
+    xfer[0].bits_per_word = _config.bits_per_word;
 
     xfer[1].tx_buf = reinterpret_cast<__u64>(buffer);
     xfer[1].rx_buf = 0;
     xfer[1].len = length;
-    xfer[1].speed_hz = 25000000;
-    xfer[1].bits_per_word = 8;
+    xfer[1].speed_hz = _config.speed;
+    xfer[1].bits_per_word = _config.bits_per_word;
 
     int retv = ioctl(_device_fd, SPI_IOC_MESSAGE(2), xfer);
     if (retv < 0) {

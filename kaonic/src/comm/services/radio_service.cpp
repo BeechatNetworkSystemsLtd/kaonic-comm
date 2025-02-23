@@ -12,6 +12,7 @@ radio_service::radio_service(const mesh::config& config,
                              const std::vector<std::shared_ptr<radio>>& radios) noexcept
     : _radios { radios }
     , _radio_broadcasters { _radios.size(), std::make_shared<mesh::network_broadcast_receiver>() } {
+
     for (size_t i = 0; i < _radios.size(); ++i) {
         _radio_networks.push_back(std::make_shared<mesh::radio_network>(
             mesh::config {

@@ -73,11 +73,15 @@ auto main(int argc, char** argv) noexcept -> int {
         return -1;
     }
 
-    radio_a->configure({
-        .freq = 869400,
-        .channel = 1,
-        .channel_spacing = 200,
-    });
+    if (auto err = radio_a->configure({
+            .freq = 869400,
+            .channel = 1,
+            .channel_spacing = 200,
+        });
+        !err.is_ok()) {
+        log::error("commd: configuration err");
+        return -1;
+    }
 
     std::vector<std::shared_ptr<comm::radio>> radios { radio_a, radio_b };
 

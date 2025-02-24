@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 
 namespace kaonic::comm::mesh {
 
-constexpr static auto rx_timeout = 100ms;
+constexpr static auto rx_timeout = 10ms;
 
 radio_network_interface::radio_network_interface(const std::shared_ptr<radio>& radio) noexcept
     : _radio { radio } {
@@ -37,12 +37,13 @@ auto radio_network_interface::transmit(const frame& frame) -> error {
 }
 
 auto radio_network_interface::receive(frame& frame) -> error {
+
     if (auto err = _radio->receive(_rx_frame, rx_timeout); !err.is_ok()) {
-        log::error("[Radio Network Interface] Unable to receive radio frame");
         return err;
     }
 
     frame.buffer.resize(_rx_frame.len);
+
     std::copy(_rx_frame.data, _rx_frame.data + _rx_frame.len, frame.buffer.begin());
 
     return error::ok();
@@ -71,7 +72,6 @@ radio_network::radio_network(const config& config,
 
 auto radio_network::start() -> error {
     if (_running.load()) {
-        log::error("[Radio Network] Mesh update is currently active");
         return error::precondition_failed();
     }
 
@@ -83,7 +83,6 @@ auto radio_network::start() -> error {
 
 auto radio_network::stop() -> error {
     if (!_running.load()) {
-        log::error("[Radio Network] Mesh update is not currently active");
         return error::precondition_failed();
     }
 

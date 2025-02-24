@@ -61,21 +61,15 @@ auto main(int argc, char** argv) noexcept -> int {
     log::info("commd: start service - {}", kaonic::info::version);
 
     const auto radio_a = std::make_shared<comm::rf215_radio>(rfa_config);
-    const auto radio_b = std::make_shared<comm::rf215_radio>(rfb_config);
 
     if (auto err = radio_a->init(); !err.is_ok()) {
         log::error("commd: unable to init the radio a");
         return -1;
     }
 
-    if (auto err = radio_b->init(); !err.is_ok()) {
-        log::error("commd: unable to init the radio b");
-        return -1;
-    }
-
     if (auto err = radio_a->configure({
             .freq = 869400,
-            .channel = 1,
+            .channel = 11,
             .channel_spacing = 200,
         });
         !err.is_ok()) {
@@ -83,13 +77,13 @@ auto main(int argc, char** argv) noexcept -> int {
         return -1;
     }
 
-    std::vector<std::shared_ptr<comm::radio>> radios { radio_a, radio_b };
+    std::vector<std::shared_ptr<comm::radio>> radios { radio_a };
 
     const comm::mesh::config mesh_config {
-        .packet_pattern = 0x77,
+        .packet_pattern = 0xB1EE,
         .slot_duration = 50ms,
         .gap_duration = 5ms,
-        .beacon_interval = 100ms,
+        .beacon_interval = 500ms,
     };
 
     const auto radio_service = std::make_shared<comm::radio_service>(mesh_config, radios);

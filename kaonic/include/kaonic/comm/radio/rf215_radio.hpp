@@ -77,6 +77,8 @@ private:
     std::unique_ptr<gpiod::line_request> _flt_sel_v2_gpio_req;
     std::unique_ptr<gpiod::line_request> _flt_sel_24_gpio_req;
 
+    std::unique_ptr<gpiod::edge_event_buffer> _irq_buffer;
+
     rf215_device _dev;
     rf215_trx* _active_trx = nullptr;
 

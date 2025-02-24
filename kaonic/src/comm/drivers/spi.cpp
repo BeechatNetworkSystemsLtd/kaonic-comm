@@ -56,12 +56,12 @@ auto spi::read_buffer(const uint16_t addr, uint8_t* buffer, size_t length) -> er
     memset(xfer, 0x00, sizeof(xfer));
 
     xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
-    xfer[0].rx_buf = 0;
+    xfer[0].rx_buf = 0x00;
     xfer[0].len = sizeof(write_reg);
     xfer[0].speed_hz = _config.speed;
     xfer[0].bits_per_word = _config.bits_per_word;
 
-    xfer[1].tx_buf = 0;
+    xfer[1].tx_buf = 0x00;
     xfer[1].rx_buf = reinterpret_cast<__u64>(buffer);
     xfer[1].len = length;
     xfer[1].speed_hz = _config.speed;
@@ -89,13 +89,13 @@ auto spi::write_buffer(const uint16_t addr, const uint8_t* buffer, size_t length
     memset(xfer, 0x00, sizeof(xfer));
 
     xfer[0].tx_buf = reinterpret_cast<__u64>(&write_reg);
-    xfer[0].rx_buf = 0;
+    xfer[0].rx_buf = 0x00;
     xfer[0].len = sizeof(write_reg);
     xfer[0].speed_hz = _config.speed;
     xfer[0].bits_per_word = _config.bits_per_word;
 
     xfer[1].tx_buf = reinterpret_cast<__u64>(buffer);
-    xfer[1].rx_buf = 0;
+    xfer[1].rx_buf = 0x00;
     xfer[1].len = length;
     xfer[1].speed_hz = _config.speed;
     xfer[1].bits_per_word = _config.bits_per_word;

@@ -111,14 +111,13 @@ auto network::rx(void* ctx, void* data, size_t max_len) noexcept -> int {
     auto data_ptr = reinterpret_cast<uint8_t*>(data);
 
     if (auto err = self._context.net_interface->receive(self.net_frame); !err.is_ok()) {
-        log::error("[Network Mesh] Unable to rx");
         return -1;
     }
 
     if (self.net_frame.buffer.size() > max_len) {
-        log::error("[Network Mesh] Unable to rx: max_len reached");
         return -1;
     }
+
     std::copy(self.net_frame.buffer.begin(), self.net_frame.buffer.end(), data_ptr);
 
     return 0;

@@ -14,15 +14,18 @@ radio_service::radio_service(const mesh::config& config,
     , _radio_broadcasters { _radios.size(), std::make_shared<mesh::network_broadcast_receiver>() } {
 
     for (size_t i = 0; i < _radios.size(); ++i) {
-        _radio_networks.push_back(std::make_shared<mesh::radio_network>(
-            mesh::config {
-                .packet_pattern = 0x77,
-                .slot_duration = 50ms,
-                .gap_duration = 5ms,
-                .beacon_interval = 100ms,
-            },
-            _radios[i],
-            _radio_broadcasters[i]));
+
+        log::debug("radio: create network");
+
+        auto net =
+            std::make_shared<mesh::radio_network>(config, _radios[i], _radio_broadcasters[i]);
+
+        _radio_networks.push_back(net);
+    }
+
+    for (const auto& net : _radio_networks) {
+        log::debug("radio: start network");
+        net->start();
     }
 }
 

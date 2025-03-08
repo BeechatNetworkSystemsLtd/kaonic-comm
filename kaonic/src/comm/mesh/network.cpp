@@ -120,7 +120,7 @@ auto network::rx(void* ctx, void* data, size_t max_len) noexcept -> int {
 
     std::copy(self.net_frame.buffer.begin(), self.net_frame.buffer.end(), data_ptr);
 
-    return 0;
+    return self.net_frame.buffer.size();
 }
 
 auto network::time(void* ctx) noexcept -> rfnet_time_t {

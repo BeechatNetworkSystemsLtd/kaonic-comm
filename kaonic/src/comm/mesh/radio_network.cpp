@@ -39,7 +39,7 @@ auto radio_network_interface::transmit(const frame& frame) -> error {
 auto radio_network_interface::receive(frame& frame) -> error {
 
     if (auto err = _radio->receive(_rx_frame, rx_timeout); !err.is_ok()) {
-        return err;
+        return error::timeout();
     }
 
     frame.buffer.resize(_rx_frame.len);

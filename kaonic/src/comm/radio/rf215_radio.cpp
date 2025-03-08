@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 
 namespace kaonic::comm {
 
-constexpr static bool rf215_log_verbose = true;
+constexpr static bool rf215_log_verbose = false;
 
 rf215_radio::rf215_radio(const rf215_radio_config& config) noexcept
     : _config { config }
@@ -170,21 +170,33 @@ auto rf215_radio::configure(const radio_config& config) -> error {
         { rf->rf09.radio_regs->RG_CMD, 0x02 },
         { rf->rf24.radio_regs->RG_IRQM, 0x00 },
         { rf->rf09.radio_regs->RG_IRQM, 0x1F },
+
         { rf->rf09.radio_regs->RG_RXBWC, 0x1A },
         { rf->rf09.radio_regs->RG_RXDFE, 0x83 },
+
         { rf->rf09.radio_regs->RG_EDD, 0x7A },
+
         { rf->rf09.radio_regs->RG_TXCUTC, 0x0A },
         { rf->rf09.radio_regs->RG_TXDFE, 0x83 },
-        { rf->rf09.radio_regs->RG_PAC, 0x62 },
-        { rf->rf09.radio_regs->RG_PADFE, 0xC0 },
-        { rf->rf09.radio_regs->RG_AUXS, 0xE2 },
+
+        // 7 6 5   4 3 2 1 0
+        // – PACUR TXPWR
+        { rf->rf09.radio_regs->RG_PAC, 0b01100000 + 8 },
+        
+        // 7 6   5 4 3 2 1 0
+        // PADFE – – – – – – 
+        { rf->rf09.radio_regs->RG_PADFE, 0b10000000 },
+
+        // 7          6 5    4     3    2   1 0
+        // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
+        { rf->rf09.radio_regs->RG_AUXS, 0b11100010 },
 
         // Baseband
         { rf->rf24.baseband_regs->RG_IRQM, 0x00 },
         { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
         { rf->rf09.baseband_regs->RG_PC, 0x0E },
         { rf->rf09.baseband_regs->RG_OFDMC, 0x00 },
-        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x06 },
+        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x01 },
 
         // clang-format on
     };
@@ -195,6 +207,17 @@ auto rf215_radio::configure(const radio_config& config) -> error {
     };
 
     rf215_write_reg_set(rf, &mod_ofdm_reg_set);
+
+    for (size_t i = 0; i < mod_ofdm_reg_set.len; ++i) {
+        uint8_t actual_reg = 0;
+        rf215_read_reg(rf, mod_ofdm_reg_set.values[i].reg, &actual_reg);
+        if (actual_reg != mod_ofdm_reg_set.values[i].value) {
+            log::warn("rf215: incorrect reg 0x{:04x} - {:02x} != {:02x}",
+                      mod_ofdm_reg_set.values[i].reg,
+                      actual_reg,
+                      mod_ofdm_reg_set.values[i].value);
+        }
+    }
 
     const rf215_freq freq {
         .channel_spacing = config.channel_spacing,
@@ -210,6 +233,17 @@ auto rf215_radio::configure(const radio_config& config) -> error {
     return error::ok();
 }
 
+static auto print_frame(const radio_frame& frame, std::string_view name) noexcept {
+    printf("<frame>:[%4dB] [%s]\n\r", (int)frame.len, name.data());
+    for (size_t i = 0x00; i < frame.len; ++i) {
+        printf("%02x ", frame.data[i]);
+        if (((i + 1) % 14) == 0) {
+            printf("|\n\r");
+        }
+    }
+    printf("<end>\n\r");
+}
+
 auto rf215_radio::transmit(const radio_frame& frame) -> error {
     if (!_active_trx) {
         log::error("rf215: trx wasn't configured");
@@ -218,12 +252,7 @@ auto rf215_radio::transmit(const radio_frame& frame) -> error {
 
     log::trace("rf215: transmit {} bytes", frame.len);
 
-    for (size_t i = 0x00; i < frame.len; ++i) {
-        printf("%02x ", frame.data[i]);
-        if ((i % 14) == 0) {
-            printf("|\n\r");
-        }
-    }
+    print_frame(frame, "TX");
 
     rf215_frame rf_frame { 0 };
     rf_frame.len = frame.len;
@@ -254,8 +283,7 @@ auto rf215_radio::receive(radio_frame& frame, const std::chrono::milliseconds& t
         frame.len = len;
         log::trace("rf215: receive {} bytes", len);
         err = error::ok();
-    } else {
-        log::trace("rf215: no receive {} {}", rc, len);
+        print_frame(frame, "RX");
     }
 
     return err;
@@ -351,7 +379,7 @@ auto rf215_radio::current_time(const void* ctx) noexcept -> rf215_millis_t {
 }
 
 auto rf215_radio::reset(const void* ctx) noexcept -> void {
-    log::debug("rf215_radio: reset");
+    log::debug("rf215: reset");
 
     auto& self = *reinterpret_cast<const rf215_radio*>(ctx);
 

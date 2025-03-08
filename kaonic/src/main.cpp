@@ -68,8 +68,8 @@ auto main(int argc, char** argv) noexcept -> int {
     }
 
     if (auto err = radio_a->configure({
-            .freq = 869400,
-            .channel = 11,
+            .freq = 902000,
+            .channel = 1,
             .channel_spacing = 200,
         });
         !err.is_ok()) {
@@ -83,7 +83,7 @@ auto main(int argc, char** argv) noexcept -> int {
         .packet_pattern = 0xB1EE,
         .slot_duration = 50ms,
         .gap_duration = 5ms,
-        .beacon_interval = 500ms,
+        .beacon_interval = 2000ms,
     };
 
     const auto radio_service = std::make_shared<comm::radio_service>(mesh_config, radios);

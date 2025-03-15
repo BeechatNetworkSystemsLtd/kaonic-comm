@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <unistd.h>
 
 #include "kaonic/common/logging.hpp"
 
@@ -53,6 +54,7 @@ radio_network::radio_network(const config& config,
                              const std::shared_ptr<radio>& radio,
                              const std::shared_ptr<network_receiver>& receiver) noexcept
     : _radio { radio }
+    , _network_interface { std::make_shared<radio_network_interface>(radio) }
     , _network_receiver { receiver }
     , _network_mesh { config,
                       context {
@@ -100,13 +102,19 @@ auto radio_network::configure(const radio_config& config) -> error {
 }
 
 auto radio_network::transmit(const frame& frame) -> error {
-    return _network_interface->transmit(frame);
+    return _network_mesh.transmit(frame);
 }
 
 auto radio_network::update() noexcept -> void {
     while (_running) {
         _network_mesh.update();
-        std::this_thread::sleep_for(500us);
+
+        {
+            struct timespec ts;
+            ts.tv_sec = 0;
+            ts.tv_nsec = 100000; // 100 µs
+            clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, nullptr);
+        }
     }
 }
 

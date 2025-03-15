@@ -19,7 +19,7 @@ using namespace std::chrono_literals;
 
 // TODO: read config from external file
 
-static constexpr auto rf215_spi_freq = 25 * 1000 * 1000;
+static constexpr auto rf215_spi_freq = 10 * 1000 * 1000;
 
 static const kaonic::comm::rf215_radio_config rfa_config = {
     .name = "rfa",
@@ -68,7 +68,7 @@ auto main(int argc, char** argv) noexcept -> int {
     }
 
     if (auto err = radio_a->configure({
-            .freq = 902000,
+            .freq = 869535,
             .channel = 1,
             .channel_spacing = 200,
         });
@@ -81,9 +81,9 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,
-        .slot_duration = 50ms,
-        .gap_duration = 5ms,
-        .beacon_interval = 2000ms,
+        .slot_duration = 60ms,
+        .gap_duration = 10ms,
+        .beacon_interval = 500ms,
     };
 
     const auto radio_service = std::make_shared<comm::radio_service>(mesh_config, radios);
@@ -100,8 +100,11 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const auto serial_service = std::make_shared<comm::serial_service>(serial, radio_service);
 
-    radio_service->attach_listener(std::make_shared<comm::serial_radio_listener>(serial_service));
-    radio_service->attach_listener(std::make_shared<comm::grpc_radio_listener>(grpc_service));
+    const auto serial_listener = std::make_shared<comm::serial_radio_listener>(serial_service);
+    const auto grpc_listener = std::make_shared<comm::grpc_radio_listener>(grpc_service);
+
+    // radio_service->attach_listener(serial_listener);
+    radio_service->attach_listener(grpc_listener);
 
     log::info("commd: start serial service");
 

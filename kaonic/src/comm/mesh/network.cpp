@@ -3,11 +3,18 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <random>
+#include <vector>
 
 #include "kaonic/common/logging.hpp"
 
 namespace kaonic::comm::mesh {
+
+constexpr auto nvmem_path = "/sys/bus/nvmem/devices/stm32-romem0/nvmem";
 
 network::network(const config& config, const context& context) noexcept
     : _context { context } {
@@ -54,14 +61,9 @@ auto network::update() noexcept -> void {
 auto network::transmit(const frame& frame) noexcept -> error {
     std::lock_guard lock { _mut };
 
-    if (!rfnet_is_tx_free(&_rfnet)) {
-        log::error("[Network Mesh] Unable to transmit: tx is busy");
-        return error::not_ready();
-    }
-
     if (auto rc = rfnet_send(&_rfnet, frame.buffer.data(), frame.buffer.size()); rc != 0) {
-        log::error("[Network Mesh] Unable to transmit: rfnet_send failed");
-        return error::fail();
+        log::error("net: tx not ready");
+        return error::not_ready();
     }
 
     return error::ok();
@@ -83,10 +85,28 @@ auto network::get_stats() noexcept -> stats {
 }
 
 auto network::generate_id() noexcept -> uint64_t {
-    std::random_device rd;
-    std::mt19937_64 generator(rd());
-    std::uniform_int_distribution<uint64_t> distribution(0, UINT64_MAX);
-    return distribution(generator);
+
+    std::ifstream uid_file(nvmem_path, std::ios::binary);
+    if (!uid_file) {
+        log::warn("net: can't open otp file - generate id");
+        std::random_device rd;
+        std::mt19937_64 generator(rd());
+        std::uniform_int_distribution<uint64_t> distribution(0, UINT64_MAX);
+        return distribution(generator);
+    }
+
+    uid_file.seekg(13 * sizeof(uint32_t), std::ios::beg);
+
+    // Read 12 bytes (96-bit UID)
+    std::vector<unsigned char> uid_data(8);
+    uid_file.read(reinterpret_cast<char*>(uid_data.data()), uid_data.size());
+
+    uint64_t uid = 0;
+    for (auto byte : uid_data) {
+        uid = (uid << 8) | byte;
+    }
+
+    return uid;
 }
 
 auto network::tx(void* ctx, void* data, size_t len) noexcept -> int {
@@ -95,10 +115,11 @@ auto network::tx(void* ctx, void* data, size_t len) noexcept -> int {
     auto data_ptr = reinterpret_cast<uint8_t*>(data);
 
     self.net_frame.buffer.resize(len);
+
     std::copy(data_ptr, data_ptr + len, self.net_frame.buffer.begin());
 
     if (auto err = self._context.net_interface->transmit(self.net_frame); !err.is_ok()) {
-        log::error("[Network Mesh] Unable to tx");
+        log::error("net: transmit failed");
         return -1;
     }
 
@@ -124,6 +145,9 @@ auto network::rx(void* ctx, void* data, size_t max_len) noexcept -> int {
 }
 
 auto network::time(void* ctx) noexcept -> rfnet_time_t {
+    // struct timespec ts;
+    // clock_gettime(CLOCK_MONOTONIC, &ts);
+    // return static_cast<rfnet_time_t>(ts.tv_sec * 1000LLU + ts.tv_nsec / 1000000LLU);
     return static_cast<rfnet_time_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch())

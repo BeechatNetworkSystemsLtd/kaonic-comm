@@ -6,7 +6,7 @@ using namespace std::chrono_literals;
 
 namespace kaonic::comm {
 
-constexpr static auto pop_timeout = 100ms;
+constexpr static auto pop_timeout = 50ms;
 
 static auto grpc_buf_pack(const RadioFrame& src, std::vector<uint8_t>& dst) -> void {
     const auto& data = src.data();
@@ -78,6 +78,8 @@ auto grpc_service::Transmit(::grpc::ServerContext* context,
     const auto& module = request->module();
     const auto& frame = request->frame();
 
+    // log::trace("grpc: transmit {} bytes {}", frame.length, frame.data.size());
+
     grpc_buf_pack(frame, _tx_frame.buffer);
 
     if (auto err = _radio_service->transmit(module, _tx_frame); !err.is_ok()) {
@@ -97,10 +99,16 @@ auto grpc_service::ReceiveStream(::grpc::ServerContext* context,
                               "Unable to set receive stream: radio service wasn't initialized");
     }
 
+    log::info("grpc: start receive stream");
+
     ReceiveResponse response;
+
     auto frame = response.mutable_frame();
 
+    writer->Write(response);
+
     while (context && !context->IsCancelled()) {
+
         if (!pop_frame(_rx_frame, pop_timeout)) {
             continue;
         }
@@ -113,11 +121,18 @@ auto grpc_service::ReceiveStream(::grpc::ServerContext* context,
                                   "Unable to write to the client stream");
         }
     }
+
+    log::debug("grpc: stop receive stream");
+
     return ::grpc::Status::OK;
 }
 
 auto grpc_service::receive_frame(const mesh::frame& frame) -> void {
     std::unique_lock<std::mutex> lock(_mut);
+
+    if (_frame_queue.size() >= 64) {
+        _frame_queue.pop();
+    }
 
     _frame_queue.push(frame);
     _frame_queue_cond.notify_one();
@@ -126,7 +141,7 @@ auto grpc_service::receive_frame(const mesh::frame& frame) -> void {
 auto grpc_service::pop_frame(mesh::frame& frame, std::chrono::milliseconds timeout) -> bool {
     std::unique_lock<std::mutex> lock(_mut);
 
-    if (!_frame_queue_cond.wait_for(lock, timeout, [this]() { return !_frame_queue.empty(); })) {
+    if (!_frame_queue_cond.wait_for(lock, timeout, [this] { return !_frame_queue.empty(); })) {
         return false;
     }
 

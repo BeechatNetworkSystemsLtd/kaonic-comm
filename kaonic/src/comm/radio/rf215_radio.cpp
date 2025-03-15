@@ -181,7 +181,7 @@ auto rf215_radio::configure(const radio_config& config) -> error {
 
         // 7 6 5   4 3 2 1 0
         // – PACUR TXPWR
-        { rf->rf09.radio_regs->RG_PAC, 0b01100000 + 8 },
+        { rf->rf09.radio_regs->RG_PAC, 0b01100000 + 10 },
         
         // 7 6   5 4 3 2 1 0
         // PADFE – – – – – – 
@@ -189,14 +189,14 @@ auto rf215_radio::configure(const radio_config& config) -> error {
 
         // 7          6 5    4     3    2   1 0
         // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
-        { rf->rf09.radio_regs->RG_AUXS, 0b11100010 },
+        { rf->rf09.radio_regs->RG_AUXS, 0b01000010 },
 
         // Baseband
         { rf->rf24.baseband_regs->RG_IRQM, 0x00 },
         { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
         { rf->rf09.baseband_regs->RG_PC, 0x0E },
         { rf->rf09.baseband_regs->RG_OFDMC, 0x00 },
-        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x01 },
+        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x04 },
 
         // clang-format on
     };
@@ -245,14 +245,14 @@ static auto print_frame(const radio_frame& frame, std::string_view name) noexcep
 }
 
 auto rf215_radio::transmit(const radio_frame& frame) -> error {
+
     if (!_active_trx) {
         log::error("rf215: trx wasn't configured");
         return error::precondition_failed();
     }
 
-    log::trace("rf215: transmit {} bytes", frame.len);
-
-    print_frame(frame, "TX");
+    // log::trace("rf215: transmit {} bytes", frame.len);
+    // print_frame(frame, "TX");
 
     rf215_frame rf_frame { 0 };
     rf_frame.len = frame.len;
@@ -281,9 +281,9 @@ auto rf215_radio::receive(radio_frame& frame, const std::chrono::milliseconds& t
     auto err = error::timeout();
     if ((rc == 0) && (len > 0)) {
         frame.len = len;
-        log::trace("rf215: receive {} bytes", len);
+        // log::trace("rf215: receive {} bytes", len);
+        // print_frame(frame, "RX");
         err = error::ok();
-        print_frame(frame, "RX");
     }
 
     return err;

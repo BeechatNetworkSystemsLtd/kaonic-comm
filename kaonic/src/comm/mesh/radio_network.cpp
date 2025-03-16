@@ -10,7 +10,7 @@ using namespace std::chrono_literals;
 
 namespace kaonic::comm::mesh {
 
-constexpr static auto rx_timeout = 10ms;
+constexpr static auto rx_timeout = 1ms;
 
 radio_network_interface::radio_network_interface(const std::shared_ptr<radio>& radio) noexcept
     : _radio { radio } {
@@ -106,13 +106,17 @@ auto radio_network::transmit(const frame& frame) -> error {
 }
 
 auto radio_network::update() noexcept -> void {
+
+    auto report_time = std::chrono::system_clock::now();
+
     while (_running) {
+
         _network_mesh.update();
 
         {
             struct timespec ts;
             ts.tv_sec = 0;
-            ts.tv_nsec = 100000; // 100 µs
+            ts.tv_nsec = 20000;
             clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, nullptr);
         }
     }

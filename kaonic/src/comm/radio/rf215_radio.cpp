@@ -196,7 +196,7 @@ auto rf215_radio::configure(const radio_config& config) -> error {
         { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
         { rf->rf09.baseband_regs->RG_PC, 0x0E },
         { rf->rf09.baseband_regs->RG_OFDMC, 0x00 },
-        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x04 },
+        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x06 },
 
         // clang-format on
     };

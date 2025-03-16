@@ -8,11 +8,14 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <thread>
 #include <vector>
 
 #include "kaonic/common/logging.hpp"
 
 namespace kaonic::comm::mesh {
+
+using namespace std::chrono_literals;
 
 constexpr auto nvmem_path = "/sys/bus/nvmem/devices/stm32-romem0/nvmem";
 
@@ -59,7 +62,13 @@ auto network::update() noexcept -> void {
 }
 
 auto network::transmit(const frame& frame) noexcept -> error {
-    std::lock_guard lock { _mut };
+    std::unique_lock lock { _mut };
+
+    while (rfnet_is_tx_free(&_rfnet) != 0) {
+        lock.unlock();
+        std::this_thread::sleep_for(50ms);
+        lock.lock();
+    }
 
     if (auto rc = rfnet_send(&_rfnet, frame.buffer.data(), frame.buffer.size()); rc != 0) {
         log::error("net: tx not ready");

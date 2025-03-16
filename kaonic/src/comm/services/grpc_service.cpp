@@ -2,6 +2,9 @@
 
 #include "kaonic/common/logging.hpp"
 
+#include <chrono>
+#include <thread>
+
 using namespace std::chrono_literals;
 
 namespace kaonic::comm {
@@ -78,11 +81,19 @@ auto grpc_service::Transmit(::grpc::ServerContext* context,
     const auto& module = request->module();
     const auto& frame = request->frame();
 
-    // log::trace("grpc: transmit {} bytes {}", frame.length, frame.data.size());
+    log::trace("grpc: transmit {}B", frame.length());
 
     grpc_buf_pack(frame, _tx_frame.buffer);
 
-    if (auto err = _radio_service->transmit(module, _tx_frame); !err.is_ok()) {
+    size_t attempt = 0;
+    auto err = error::not_ready();
+    while (err.code == error_code::not_ready && attempt < 4) {
+        err = _radio_service->transmit(module, _tx_frame);
+        std::this_thread::sleep_for(100ms);
+        ++attempt;
+    }
+
+    if (!err.is_ok()) {
         log::error("[GRPC service] Unable to transmit");
         return ::grpc::Status(::grpc::StatusCode::INTERNAL, "Unable to transmit");
     }

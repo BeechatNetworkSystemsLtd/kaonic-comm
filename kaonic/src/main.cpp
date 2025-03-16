@@ -81,8 +81,8 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,
-        .slot_duration = 60ms,
-        .gap_duration = 10ms,
+        .slot_duration = 30ms,
+        .gap_duration = 5ms,
         .beacon_interval = 500ms,
     };
 

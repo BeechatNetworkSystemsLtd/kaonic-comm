@@ -18,7 +18,7 @@ extern "C" {
 
 namespace kaonic::comm::mesh {
 
-constexpr static size_t peers_storage_size = 100;
+constexpr static size_t peers_storage_size = 16;
 
 struct config final {
     uint16_t packet_pattern;

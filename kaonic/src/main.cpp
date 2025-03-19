@@ -69,7 +69,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     if (auto err = radio_a->configure({
             .freq = 869535,
-            .channel = 1,
+            .channel = 11,
             .channel_spacing = 200,
         });
         !err.is_ok()) {
@@ -81,7 +81,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,
-        .slot_duration = 30ms,
+        .slot_duration = 50ms,
         .gap_duration = 5ms,
         .beacon_interval = 500ms,
     };

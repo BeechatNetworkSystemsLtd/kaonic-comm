@@ -81,17 +81,9 @@ auto grpc_service::Transmit(::grpc::ServerContext* context,
     const auto& module = request->module();
     const auto& frame = request->frame();
 
-    log::trace("grpc: transmit {}B", frame.length());
-
     grpc_buf_pack(frame, _tx_frame.buffer);
 
-    size_t attempt = 0;
-    auto err = error::not_ready();
-    while (err.code == error_code::not_ready && attempt < 4) {
-        err = _radio_service->transmit(module, _tx_frame);
-        std::this_thread::sleep_for(100ms);
-        ++attempt;
-    }
+    auto err = _radio_service->transmit(module, _tx_frame);
 
     if (!err.is_ok()) {
         log::error("[GRPC service] Unable to transmit");

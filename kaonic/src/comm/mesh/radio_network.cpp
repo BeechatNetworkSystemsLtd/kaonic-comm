@@ -116,7 +116,7 @@ auto radio_network::update() noexcept -> void {
         {
             struct timespec ts;
             ts.tv_sec = 0;
-            ts.tv_nsec = 20000;
+            ts.tv_nsec = 10000;
             clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, nullptr);
         }
     }

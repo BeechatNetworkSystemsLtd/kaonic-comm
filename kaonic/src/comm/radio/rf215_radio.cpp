@@ -8,6 +8,8 @@ extern "C" {
 #include "rf215/rf215_baseband.h"
 }
 
+#include "spdlog/stopwatch.h"
+
 using namespace std::chrono_literals;
 
 namespace kaonic::comm {

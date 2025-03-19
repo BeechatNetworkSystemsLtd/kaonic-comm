@@ -44,9 +44,11 @@ network::network(const config& config, const context& context) noexcept
         },
         .peer_storage = {
             .peers = peers,
-            .count = 0,
+            .count = peers_storage_size,
         },
         .beacon_interval = static_cast<uint16_t>(config.beacon_interval.count()),
+        .slot_duration = static_cast<uint16_t>(config.slot_duration.count()),
+        .gap_duration = static_cast<uint16_t>(config.gap_duration.count()),
     };
     rfnet_init(&_rfnet, &rf_config);
 }
@@ -66,7 +68,7 @@ auto network::transmit(const frame& frame) noexcept -> error {
 
     while (rfnet_is_tx_free(&_rfnet) != 0) {
         lock.unlock();
-        std::this_thread::sleep_for(50ms);
+        std::this_thread::sleep_for(5ms);
         lock.lock();
     }
 

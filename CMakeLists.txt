@@ -16,7 +16,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Git)
 
 include(cmake/version.cmake)
-include(cmake/config.cmake)
 
 project(
     kaonic-comm
@@ -39,4 +38,4 @@ endif()
 add_subdirectory(extern)
 add_subdirectory(proto)
 add_subdirectory(kaonic)
-# add_subdirectory(tests)
+

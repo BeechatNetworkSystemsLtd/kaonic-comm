@@ -2,7 +2,7 @@
 
 #include <variant>
 
-#include <radio.grpc.pb.h>
+#include <kaonic.grpc.pb.h>
 
 namespace kaonic::comm::serial {
 

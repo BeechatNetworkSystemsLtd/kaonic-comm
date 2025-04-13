@@ -51,15 +51,26 @@ auto grpc_service::Configure(::grpc::ServerContext* context,
                               "Unable to configure radio: radio service wasn't initialized");
     }
 
-    const auto& module = request->module();
-    const auto& freq = request->freq();
-    const auto& channel = request->channel();
-    const auto& channel_spacing = request->channel_spacing();
+    const auto module = request->module();
+    const auto freq = request->freq();
+    const auto channel = request->channel();
+    const auto channel_spacing = request->channel_spacing();
+    const auto tx_power = request->tx_power();
+
+    radio_phy_config_t phy_config = radio_phy_config_ofdm {};
+
+    if (request->has_ofdm()) {
+        phy_config = radio_phy_config_ofdm {
+            .mcs = request->ofdm().mcs(),
+            .opt = request->ofdm().opt(),
+        };
+    }
 
     radio_config config {
         .freq = freq,
         .channel = static_cast<uint8_t>(channel),
         .channel_spacing = channel_spacing,
+        .phy_config = phy_config,
     };
 
     if (auto err = _radio_service->configure(module, config); !err.is_ok()) {

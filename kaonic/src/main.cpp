@@ -71,6 +71,12 @@ auto main(int argc, char** argv) noexcept -> int {
             .freq = 869535,
             .channel = 11,
             .channel_spacing = 200,
+            .tx_power = 10,
+            .phy_config =
+                comm::radio_phy_config_ofdm {
+                    .mcs = 6,
+                    .opt = 0,
+                },
         });
         !err.is_ok()) {
         log::error("commd: configuration err");

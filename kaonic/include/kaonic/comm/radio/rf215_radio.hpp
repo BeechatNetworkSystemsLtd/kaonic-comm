@@ -60,6 +60,8 @@ private:
 
     static auto sleep(const void* ctx, rf215_millis_t delay) noexcept -> void;
 
+    auto select_filter(const radio_config& config) noexcept -> void;
+
 protected:
     rf215_radio(const rf215_radio&) = delete;
     rf215_radio(rf215_radio&&) = delete;

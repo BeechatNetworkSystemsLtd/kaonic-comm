@@ -1,6 +1,8 @@
 #include "kaonic/comm/radio/rf215_radio.hpp"
 
 #include <chrono>
+#include <type_traits>
+#include <variant>
 
 #include "kaonic/common/logging.hpp"
 
@@ -123,15 +125,7 @@ auto rf215_radio::init() -> error {
     return error::ok();
 }
 
-auto rf215_radio::configure(const radio_config& config) -> error {
-
-    log::debug("rf215: configure to {}kHz {}ch {}kHz spacing",
-               config.freq,
-               config.channel,
-               config.channel_spacing);
-
-    _active_trx = rf215_get_trx_by_freq(&_dev, config.freq);
-
+auto rf215_radio::select_filter(const radio_config& config) noexcept -> void {
     // Filter selection
     // TODO: Allow external configuration of filter
     if (902000 <= config.freq && config.freq <= 928000) {
@@ -159,67 +153,85 @@ auto rf215_radio::configure(const radio_config& config) -> error {
         _flt_sel_v2_gpio_req->set_value(_config.flt_sel_v2_gpio.gpio_line,
                                         gpiod::line::value::INACTIVE);
     }
+}
+
+auto rf215_radio::configure(const radio_config& config) -> error {
+
+    log::debug("rf215: configure to {}kHz {}ch {}kHz spacing",
+               config.freq,
+               config.channel,
+               config.channel_spacing);
+
+    select_filter(config);
+
+    _active_trx = rf215_get_trx_by_freq(&_dev, config.freq);
 
     auto rf = &_dev;
 
-    // Configure registers
-    const struct rf215_reg_value mod_ofdm_values[] = {
-        // clang-format off
+    const uint8_t tx_power = static_cast<uint8_t>(std::min(config.tx_power, 12u));
 
-        // Radio
-        { rf->common_regs->RG_RF_CLKO, 0x02 },
+    auto err = error::ok();
 
-        { rf->rf09.radio_regs->RG_CMD, 0x02 },
-        { rf->rf24.radio_regs->RG_IRQM, 0x00 },
-        { rf->rf09.radio_regs->RG_IRQM, 0x1F },
+    err += std::visit(
+        [&](auto&& phy_config) {
+            using T = std::decay_t<decltype(phy_config)>;
 
-        { rf->rf09.radio_regs->RG_RXBWC, 0x1A },
-        { rf->rf09.radio_regs->RG_RXDFE, 0x83 },
+            int rc = 0;
 
-        { rf->rf09.radio_regs->RG_EDD, 0x7A },
+            if constexpr (std::is_same_v<T, radio_phy_config_ofdm>) {
 
-        { rf->rf09.radio_regs->RG_TXCUTC, 0x0A },
-        { rf->rf09.radio_regs->RG_TXDFE, 0x83 },
+                // Configure registers
+                const struct rf215_reg_value mod_ofdm_values[] = {
+                    // clang-format off
 
-        // 7 6 5   4 3 2 1 0
-        // – PACUR TXPWR
-        { rf->rf09.radio_regs->RG_PAC, 0b01100000 + 10 },
-        
-        // 7 6   5 4 3 2 1 0
-        // PADFE – – – – – – 
-        { rf->rf09.radio_regs->RG_PADFE, 0b10000000 },
+                    // Radio
+                    { rf->common_regs->RG_RF_CLKO, 0x02 },
 
-        // 7          6 5    4     3    2   1 0
-        // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
-        { rf->rf09.radio_regs->RG_AUXS, 0b01000010 },
+                    { rf->rf09.radio_regs->RG_CMD, 0x02 },
+                    { rf->rf24.radio_regs->RG_IRQM, 0x00 },
+                    { rf->rf09.radio_regs->RG_IRQM, 0x1F },
 
-        // Baseband
-        { rf->rf24.baseband_regs->RG_IRQM, 0x00 },
-        { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
-        { rf->rf09.baseband_regs->RG_PC, 0x0E },
-        { rf->rf09.baseband_regs->RG_OFDMC, 0x00 },
-        { rf->rf09.baseband_regs->RG_OFDMPHRTX, 0x06 },
+                    { rf->rf09.radio_regs->RG_RXBWC, 0x1A },
+                    { rf->rf09.radio_regs->RG_RXDFE, 0x83 },
 
-        // clang-format on
-    };
+                    { rf->rf09.radio_regs->RG_EDD, 0x7A },
 
-    const struct rf215_reg_set mod_ofdm_reg_set = {
-        .values = mod_ofdm_values,
-        .len = RF215_REG_VALUE_ARRAY_COUNT(mod_ofdm_values),
-    };
+                    { rf->rf09.radio_regs->RG_TXCUTC, 0x0A },
+                    { rf->rf09.radio_regs->RG_TXDFE, 0x83 },
 
-    rf215_write_reg_set(rf, &mod_ofdm_reg_set);
+                    // 7 6 5   4 3 2 1 0
+                    // – PACUR TXPWR
+                    { rf->rf09.radio_regs->RG_PAC, static_cast<uint8_t>(0b01100000 | tx_power) },
+                    
+                    // 7 6   5 4 3 2 1 0
+                    // PADFE – – – – – – 
+                    { rf->rf09.radio_regs->RG_PADFE, 0b10000000 },
 
-    for (size_t i = 0; i < mod_ofdm_reg_set.len; ++i) {
-        uint8_t actual_reg = 0;
-        rf215_read_reg(rf, mod_ofdm_reg_set.values[i].reg, &actual_reg);
-        if (actual_reg != mod_ofdm_reg_set.values[i].value) {
-            log::warn("rf215: incorrect reg 0x{:04x} - {:02x} != {:02x}",
-                      mod_ofdm_reg_set.values[i].reg,
-                      actual_reg,
-                      mod_ofdm_reg_set.values[i].value);
-        }
-    }
+                    // 7          6 5    4     3    2   1 0
+                    // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
+                    { rf->rf09.radio_regs->RG_AUXS, 0b01000010 },
+
+                    // Baseband
+                    { rf->rf24.baseband_regs->RG_IRQM, 0x00 },
+                    { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
+                    { rf->rf09.baseband_regs->RG_PC, 0x0E },
+                    { rf->rf09.baseband_regs->RG_OFDMC, static_cast<uint8_t>(std::min(phy_config.opt, 3u)) },
+                    { rf->rf09.baseband_regs->RG_OFDMPHRTX, static_cast<uint8_t>(std::min(phy_config.mcs, 6u)) },
+
+                    // clang-format on
+                };
+
+                const struct rf215_reg_set reg_set = {
+                    .values = mod_ofdm_values,
+                    .len = RF215_REG_VALUE_ARRAY_COUNT(mod_ofdm_values),
+                };
+
+                rc = rf215_write_reg_set(rf, &reg_set);
+            }
+
+            return error::from_rc(rc);
+        },
+        config.phy_config);
 
     const rf215_freq freq {
         .channel_spacing = config.channel_spacing,
@@ -227,12 +239,12 @@ auto rf215_radio::configure(const radio_config& config) -> error {
         .channel = config.channel,
     };
 
-    if (auto err = rf215_set_freq(_active_trx, &freq); err != 0) {
-        log::error("rf215: set radio frequency failed");
-        return error::fail();
+    err += error::from_rc(rf215_set_freq(_active_trx, &freq));
+    if (!err.is_ok()) {
+        log::error("rf215: set radio config failed");
     }
 
-    return error::ok();
+    return err;
 }
 
 static auto print_frame(const radio_frame& frame, std::string_view name) noexcept {

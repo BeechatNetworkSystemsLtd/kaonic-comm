@@ -34,6 +34,10 @@ struct error final {
         return error { error_code::fail };
     }
 
+    [[nodiscard]] static constexpr auto from_rc(int rc) noexcept -> error {
+        return error { rc < 0 ? error_code::fail : error_code::ok };
+    }
+
     [[nodiscard]] static constexpr auto invalid_arg() noexcept -> error {
         return error { error_code::invalid_arg };
     }

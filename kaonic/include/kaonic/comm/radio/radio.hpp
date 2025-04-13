@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <variant>
 
 #include "kaonic/comm/mesh/network_interface.hpp"
 #include "kaonic/common/error.hpp"
@@ -15,10 +16,19 @@ struct radio_frame final {
     uint8_t data[data_max_size];
 };
 
+struct radio_phy_config_ofdm {
+    uint32_t mcs = 6;
+    uint32_t opt = 0;
+};
+
+using radio_phy_config_t = std::variant<radio_phy_config_ofdm>;
+
 struct radio_config final {
-    uint32_t freq = 0;
-    uint8_t channel = 0;
-    uint32_t channel_spacing = 0;
+    uint32_t freq = 869535;
+    uint8_t channel = 1;
+    uint32_t channel_spacing = 200;
+    uint32_t tx_power = 10;
+    radio_phy_config_t phy_config = radio_phy_config_ofdm {};
 };
 
 class radio {

@@ -9,7 +9,7 @@
 
 #include "kaonic/comm/services/radio_service.hpp"
 
-#include <radio.grpc.pb.h>
+#include <kaonic.grpc.pb.h>
 
 #include <grpc/grpc.h>
 

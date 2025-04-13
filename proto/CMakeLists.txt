@@ -1,7 +1,5 @@
 set(PROTO_FILES
-    empty.proto
-    device.proto
-    radio.proto
+    kaonic.proto
 )
 
 add_library(kaonic_proto ${PROTO_FILES})

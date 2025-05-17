@@ -30,7 +30,6 @@ auto radio_network_interface::transmit(const frame& frame) -> error {
     _tx_frame.len = frame.buffer.size();
 
     if (auto err = _radio->transmit(_tx_frame); !err.is_ok()) {
-        log::error("[Radio Network Interface] Unable to transmit radio frame");
         return err;
     }
 
@@ -56,11 +55,13 @@ radio_network::radio_network(const config& config,
     : _radio { radio }
     , _network_interface { std::make_shared<radio_network_interface>(radio) }
     , _network_receiver { receiver }
-    , _network_mesh { config,
-                      context {
-                          std::make_shared<radio_network_interface>(_radio),
-                          _network_receiver,
-                      } } {
+    , _network_mesh {
+        config,
+        context {
+            std::make_shared<radio_network_interface>(_radio),
+            _network_receiver,
+        },
+    } {
     if (!_radio) {
         log::error("[Radio Network] Radio wasn't initialized");
         return;

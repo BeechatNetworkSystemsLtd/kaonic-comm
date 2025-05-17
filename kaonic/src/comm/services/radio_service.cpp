@@ -15,10 +15,13 @@ radio_service::radio_service(const mesh::config& config,
 
     for (size_t i = 0; i < _radios.size(); ++i) {
 
-        log::debug("radio: create network");
+        auto net_config = config;
+        net_config.id_base = (i + 1u);
+
+        log::debug("radio: create network [{}]", i);
 
         auto net =
-            std::make_shared<mesh::radio_network>(config, _radios[i], _radio_broadcasters[i]);
+            std::make_shared<mesh::radio_network>(net_config, _radios[i], _radio_broadcasters[i]);
 
         _radio_networks.push_back(net);
     }

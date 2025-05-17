@@ -22,6 +22,7 @@ constexpr static size_t peers_storage_size = 16;
 
 struct config final {
     uint16_t packet_pattern;
+    uint64_t id_base = 0x00;
     std::chrono::milliseconds slot_duration;
     std::chrono::milliseconds gap_duration;
     std::chrono::milliseconds beacon_interval;
@@ -75,6 +76,7 @@ protected:
     network& operator=(network&&) = default;
 
 private:
+    config _config;
     context _context;
 
     rfnet_peer peers[peers_storage_size];

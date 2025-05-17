@@ -54,20 +54,16 @@ static const comm::serial::config serial_config {
     .baud_rate = 115200,
 };
 
-auto main(int argc, char** argv) noexcept -> int {
+static auto create_radio(const kaonic::comm::rf215_radio_config& config)
+    -> std::shared_ptr<comm::rf215_radio> {
+    auto radio = std::make_shared<comm::rf215_radio>(config);
 
-    log::set_level(log::level::trace);
-
-    log::info("commd: start service - {}", kaonic::info::version);
-
-    const auto radio_a = std::make_shared<comm::rf215_radio>(rfa_config);
-
-    if (auto err = radio_a->init(); !err.is_ok()) {
-        log::error("commd: unable to init the radio a");
-        return -1;
+    if (auto err = radio->init(); !err.is_ok()) {
+        log::error("radio init failed");
+        return nullptr;
     }
 
-    if (auto err = radio_a->configure({
+    if (auto err = radio->configure({
             .freq = 869535,
             .channel = 11,
             .channel_spacing = 200,
@@ -80,10 +76,35 @@ auto main(int argc, char** argv) noexcept -> int {
         });
         !err.is_ok()) {
         log::error("commd: configuration err");
-        return -1;
+        return nullptr;
     }
 
-    std::vector<std::shared_ptr<comm::radio>> radios { radio_a };
+    return radio;
+}
+
+auto main(int argc, char** argv) noexcept -> int {
+
+    log::set_level(log::level::trace);
+
+    log::info("commd: start service - {}", kaonic::info::version);
+
+    std::vector<std::shared_ptr<comm::radio>> radios;
+
+    // Initialize Radio Frontend A
+    {
+        const auto radio = create_radio(rfa_config);
+        if (radio) {
+            radios.push_back(radio);
+        }
+    }
+
+    // Initialize Radio Frontend B
+    {
+        const auto radio = create_radio(rfb_config);
+        if (radio) {
+            radios.push_back(radio);
+        }
+    }
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,

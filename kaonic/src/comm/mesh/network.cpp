@@ -20,7 +20,8 @@ using namespace std::chrono_literals;
 constexpr auto nvmem_path = "/sys/bus/nvmem/devices/stm32-romem0/nvmem";
 
 network::network(const config& config, const context& context) noexcept
-    : _context { context } {
+    : _config { config }
+    , _context { context } {
     if (!_context.net_interface) {
         log::error("[Network Mesh] net_interface wasn't initialized");
         return;
@@ -167,7 +168,10 @@ auto network::time(void* ctx) noexcept -> rfnet_time_t {
 
 auto network::gen_id(void* ctx, rfnet_node_id_t* id) noexcept -> void {
     if (id) {
+        auto& self = *reinterpret_cast<network*>(ctx);
         *id = generate_id();
+        *id &= ~(static_cast<rfnet_node_id_t>(0x0F));
+        *id |= static_cast<rfnet_node_id_t>(self._config.id_base);
     }
 }
 

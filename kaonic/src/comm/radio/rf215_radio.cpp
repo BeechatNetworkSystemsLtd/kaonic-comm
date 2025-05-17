@@ -120,7 +120,12 @@ auto rf215_radio::init() -> error {
 
     const auto rf215_pn = rf215_probe(&_dev);
 
-    log::info("rf215: detected '0x{:08x}' rf215 part-number", static_cast<int>(rf215_pn));
+    if (rf215_pn != 0x00) {
+        log::info("rf215: detected '0x{:08x}' rf215 part-number", static_cast<int>(rf215_pn));
+    } else {
+        log::error("rf215: chip not detected");
+        return error::fail();
+    }
 
     return error::ok();
 }

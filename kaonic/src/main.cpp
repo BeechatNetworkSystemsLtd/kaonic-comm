@@ -30,9 +30,9 @@ static const kaonic::comm::rf215_radio_config rfa_config = {
         },
     .rst_gpio = { "/dev/gpiochip3", 8 },
     .irq_gpio = { "/dev/gpiochip3", 9 },
-    .flt_sel_v1_gpio = { "/dev/gpiochip8", 10 },
-    .flt_sel_v2_gpio = { "/dev/gpiochip8", 11 },
-    .flt_sel_24_gpio = { "/dev/gpiochip8", 12 },
+    .flt_sel_v1_gpio = { "/dev/gpiochip9", 10 },
+    .flt_sel_v2_gpio = { "/dev/gpiochip9", 11 },
+    .flt_sel_24_gpio = { "/dev/gpiochip9", 12 },
 };
 
 static const kaonic::comm::rf215_radio_config rfb_config = {
@@ -44,9 +44,9 @@ static const kaonic::comm::rf215_radio_config rfb_config = {
         },
     .rst_gpio = { "/dev/gpiochip4", 13 },
     .irq_gpio = { "/dev/gpiochip4", 15 },
-    .flt_sel_v1_gpio = { "/dev/gpiochip8", 0 },
-    .flt_sel_v2_gpio = { "/dev/gpiochip8", 1 },
-    .flt_sel_24_gpio = { "/dev/gpiochip8", 2 },
+    .flt_sel_v1_gpio = { "/dev/gpiochip9", 0 },
+    .flt_sel_v2_gpio = { "/dev/gpiochip9", 1 },
+    .flt_sel_24_gpio = { "/dev/gpiochip9", 2 },
 };
 
 static const comm::serial::config serial_config {

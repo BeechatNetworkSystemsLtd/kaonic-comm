@@ -40,7 +40,7 @@ static const kaonic::comm::rf215_radio_config rfb_config = {
     .spi =
         (drivers::spi_config) {
             .dev = "/dev/spidev3.0",
-            .speed = rf215_spi_freq,
+            .speed = 5 * 1000 * 1000,
         },
     .rst_gpio = { "/dev/gpiochip4", 13 },
     .irq_gpio = { "/dev/gpiochip4", 15 },

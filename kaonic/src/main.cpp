@@ -10,7 +10,6 @@
 
 #include "kaonic/comm/services/grpc_service.hpp"
 #include "kaonic/comm/services/radio_service.hpp"
-#include "kaonic/comm/services/serial_service.hpp"
 
 #include <grpcpp/server_builder.h>
 
@@ -90,17 +89,17 @@ auto main(int argc, char** argv) noexcept -> int {
 
     std::vector<std::shared_ptr<comm::radio>> radios;
 
-    // Initialize Radio Frontend A
+    // Initialize Radio Frontend B
     {
-        const auto radio = create_radio(rfa_config);
+        const auto radio = create_radio(rfb_config);
         if (radio) {
             radios.push_back(radio);
         }
     }
 
-    // Initialize Radio Frontend B
+    // Initialize Radio Frontend A
     {
-        const auto radio = create_radio(rfb_config);
+        const auto radio = create_radio(rfa_config);
         if (radio) {
             radios.push_back(radio);
         }
@@ -115,30 +114,13 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const auto radio_service = std::make_shared<comm::radio_service>(mesh_config, radios);
 
-    const auto serial = std::make_shared<comm::serial::serial>();
-
-    if (auto err = serial->open(serial_config); !err.is_ok()) {
-        log::error("commd: open serial device failed");
-        return -1;
-    }
-
     const auto grpc_service =
         std::make_shared<comm::grpc_service>(radio_service, kaonic::info::version);
 
-    const auto serial_service = std::make_shared<comm::serial_service>(serial, radio_service);
-
-    const auto serial_listener = std::make_shared<comm::serial_radio_listener>(serial_service);
     const auto grpc_listener = std::make_shared<comm::grpc_radio_listener>(grpc_service);
 
     // radio_service->attach_listener(serial_listener);
     radio_service->attach_listener(grpc_listener);
-
-    log::info("commd: start serial service");
-
-    if (auto err = serial_service->start_tx(); !err.is_ok()) {
-        log::error("[Server] Unable to start serial RX monitoring");
-        return -1;
-    }
 
     log::info("commd: start grpc service");
 

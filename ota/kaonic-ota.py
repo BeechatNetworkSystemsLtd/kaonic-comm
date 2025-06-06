@@ -1,4 +1,9 @@
 from contextlib import asynccontextmanager
+from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, ed25519, padding
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from pathlib import Path
@@ -18,9 +23,10 @@ BINARY_PATH = Path("/usr/bin")
 APP_PATH = BINARY_PATH / "kaonic-commd"
 
 METADATA_PATH = Path("/etc/kaonic")
-VERSION_FILE = METADATA_PATH / "kaonic-commd.version"
-HASH_FILE = METADATA_PATH / "kaonic-commd.sha256"
+VERSION_PATH = METADATA_PATH / "kaonic-commd.version"
+HASH_PATH = METADATA_PATH / "kaonic-commd.sha256"
 BACKUP_PATH = METADATA_PATH / "kaonic-commd.bak"
+CERT_PATH = METADATA_PATH / "kaonic-commd.pem"
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -41,23 +47,60 @@ def validate_app_file():
         logger.info("No kaonic_commd and kaonic_commd.bak")
         return
 
-    expected_hash = HASH_FILE.read_text().strip() if HASH_FILE.exists() else ""
+    expected_hash = HASH_PATH.read_text().strip() if HASH_PATH.exists() else ""
     actual_hash = sha256sum(APP_PATH) if APP_PATH.exists() else ""
 
-    if (not APP_PATH.exists() or not HASH_FILE.exists()) or (expected_hash != actual_hash):
+    if (not APP_PATH.exists() or not HASH_PATH.exists()) or (expected_hash != actual_hash):
         logger.info("Restoring app from the backup")
         stop_kaonic_commd()
         restore_backup()
         launch_kaonic_commd()
 
+def validate_signature(binary_path, signature_path, certificate_path):
+    try:
+        cert = x509.load_pem_x509_certificate(certificate_path.read_bytes())
+        public_key = cert.public_key()
+
+        message = binary_path.read_bytes()
+        signature = signature_path.read_bytes()
+
+        if isinstance(public_key, rsa.RSAPublicKey):
+            public_key.verify(
+                signature,
+                message,
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+        elif isinstance(public_key, ed25519.Ed25519PublicKey):
+            public_key.verify(signature, message)
+        else:
+            logger.error(f"Unsupported key type in X.509: {type(public_key)}")
+            return False
+
+        return True
+
+    except InvalidSignature:
+        logger.error("Signature verification failed")
+        return False
+    except Exception as e:
+        logger.error(f"Error during signature verification: {e}")
+        return False
+
 @app.post("/api/ota/commd/upload")
 async def upload_ota(file: UploadFile = File(...)):
     if file.content_type != "application/x-zip-compressed":
         raise HTTPException(status_code=400, detail="Only ZIP files accepted")
+    
+    if not CERT_PATH.exists():
+        raise HTTPException(status_code=500, detail="OTA certificate is not present")
 
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         temp_dir = Path(tmp_dir_str)
         zip_path = temp_dir / "upload.zip"
+        app_path = temp_dir / "kaonic-commd"
+        hash_path = temp_dir / "kaonic-commd.sha256"
+        sign_path = temp_dir / "kaonic-commd.sig"
+        version_path = temp_dir / "kaonic-commd.version"
 
         with zip_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -77,8 +120,8 @@ async def upload_ota(file: UploadFile = File(...)):
                 logger.error(f"Missing {req_file} in OTA package")
                 raise HTTPException(status_code=400, detail=f"Missing {req_file} in OTA package")
 
-        expected_hash = (temp_dir / "kaonic-commd.sha256").read_text().strip()
-        actual_hash = sha256sum(temp_dir / "kaonic-commd")
+        expected_hash = (hash_path).read_text().strip()
+        actual_hash = sha256sum(app_path)
 
         logger.info(f"Expected hash: {expected_hash}")
         logger.info(f"Actual hash: {actual_hash}")
@@ -86,11 +129,15 @@ async def upload_ota(file: UploadFile = File(...)):
         if expected_hash != actual_hash:
             logger.error("SHA256 hash mismatch")
             raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
+        
+        if not validate_signature(app_path, sign_path, CERT_PATH):
+            logger.error("Signature wasn't validated")
+            raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
 
         stop_kaonic_commd()
         backup_current()
 
-        shutil.copy2(temp_dir / "kaonic-commd", APP_PATH)
+        shutil.copy2(app_path, APP_PATH)
 
         logger.info("Changing app file permissions")
         current_permissions = APP_PATH.stat().st_mode
@@ -107,8 +154,8 @@ async def upload_ota(file: UploadFile = File(...)):
                 break
 
         if is_kaonic_running():
-            shutil.copy2(temp_dir / "kaonic-commd.sha256", HASH_FILE)
-            shutil.copy2(temp_dir / "kaonic-commd.version", VERSION_FILE)
+            shutil.copy2(hash_path, HASH_PATH)
+            shutil.copy2(version_path, VERSION_PATH)
             logger.info("Updated successfully")
             return {"detail": "Update successful"}
         else:
@@ -119,11 +166,11 @@ async def upload_ota(file: UploadFile = File(...)):
 
 @app.get("/api/ota/commd/version")
 def get_version():
-    if not VERSION_FILE.exists() or not HASH_FILE.exists():
+    if not VERSION_PATH.exists() or not HASH_PATH.exists():
         return JSONResponse(content={"version": None, "hash": None})
 
-    version = VERSION_FILE.read_text().strip()
-    hash_val = HASH_FILE.read_text().strip()
+    version = VERSION_PATH.read_text().strip()
+    hash_val = HASH_PATH.read_text().strip()
     return {"version": version, "hash": hash_val}
 
 def sha256sum(file_path: Path) -> str:
@@ -136,7 +183,7 @@ def sha256sum(file_path: Path) -> str:
 def stop_kaonic_commd():
     logger.info("Stopping kaonic-commd service via systemctl")
     subprocess.run(
-        ["sudo", "systemctl", "stop", "kaonic-commd.service"],
+        ["systemctl", "stop", "kaonic-commd.service"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False
@@ -153,7 +200,7 @@ def is_kaonic_running() -> bool:
 def launch_kaonic_commd():
     logger.info("Starting kaonic-commd service via systemctl")
     subprocess.run(
-        ["sudo", "systemctl", "start", "kaonic-commd.service"],
+        ["systemctl", "start", "kaonic-commd.service"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False
@@ -180,7 +227,7 @@ def restore_backup():
 if __name__ == "__main__":
     uvicorn.run(
         "kaonic-ota:app",
-        host="127.0.0.1",
-        port=8080,
+        host="0.0.0.0",
+        port=8682,
         reload=True
     )

@@ -1,6 +1,10 @@
 #include "version.hpp"
 
+#include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <memory>
+#include <string>
 
 #include "kaonic/common/logging.hpp"
 
@@ -18,40 +22,91 @@ using namespace std::chrono_literals;
 
 // TODO: read config from external file
 
+struct kaonic_machine_config {
+    kaonic::comm::rf215_radio_config rfa_config;
+    kaonic::comm::rf215_radio_config rfb_config;
+};
+
 static constexpr auto rf215_spi_freq = 10 * 1000 * 1000;
 
-static const kaonic::comm::rf215_radio_config rfa_config = {
-    .name = "rfa",
-    .spi =
-        (drivers::spi_config) {
-            .dev = "/dev/spidev6.0",
-            .speed = rf215_spi_freq,
+static const kaonic_machine_config machine_config_protoa = {
+    .rfa_config =
+        kaonic::comm::rf215_radio_config {
+            .name = "rfa",
+            .spi =
+                (drivers::spi_config) {
+                    .dev = "/dev/spidev6.0",
+                    .speed = rf215_spi_freq,
+                },
+            .rst_gpio = { "/dev/gpiochip3", 8 },
+            .irq_gpio = { "/dev/gpiochip3", 9 },
+            .flt_sel_v1_gpio = { "/dev/gpiochip8", 10 },
+            .flt_sel_v2_gpio = { "/dev/gpiochip8", 11 },
+            .flt_sel_24_gpio = { "/dev/gpiochip8", 12 },
         },
-    .rst_gpio = { "/dev/gpiochip3", 8 },
-    .irq_gpio = { "/dev/gpiochip3", 9 },
-    .flt_sel_v1_gpio = { "/dev/gpiochip9", 10 },
-    .flt_sel_v2_gpio = { "/dev/gpiochip9", 11 },
-    .flt_sel_24_gpio = { "/dev/gpiochip9", 12 },
+    .rfb_config =
+        kaonic::comm::rf215_radio_config {
+            .name = "rfb",
+            .spi =
+                (drivers::spi_config) {
+                    .dev = "/dev/spidev3.0",
+                    .speed = rf215_spi_freq,
+                },
+            .rst_gpio = { "/dev/gpiochip4", 13 },
+            .irq_gpio = { "/dev/gpiochip4", 15 },
+            .flt_sel_v1_gpio = { "/dev/gpiochip8", 0 },
+            .flt_sel_v2_gpio = { "/dev/gpiochip8", 1 },
+            .flt_sel_24_gpio = { "/dev/gpiochip8", 2 },
+        },
 };
 
-static const kaonic::comm::rf215_radio_config rfb_config = {
-    .name = "rfb",
-    .spi =
-        (drivers::spi_config) {
-            .dev = "/dev/spidev3.0",
-            .speed = 5 * 1000 * 1000,
+static const kaonic_machine_config machine_config_protob = {
+    .rfa_config =
+        kaonic::comm::rf215_radio_config {
+            .name = "rfa",
+            .spi =
+                (drivers::spi_config) {
+                    .dev = "/dev/spidev6.0",
+                    .speed = rf215_spi_freq,
+                },
+            .rst_gpio = { "/dev/gpiochip3", 8 },
+            .irq_gpio = { "/dev/gpiochip3", 9 },
+            .flt_sel_v1_gpio = { "/dev/gpiochip9", 10 },
+            .flt_sel_v2_gpio = { "/dev/gpiochip9", 11 },
+            .flt_sel_24_gpio = { "/dev/gpiochip9", 12 },
         },
-    .rst_gpio = { "/dev/gpiochip4", 13 },
-    .irq_gpio = { "/dev/gpiochip4", 15 },
-    .flt_sel_v1_gpio = { "/dev/gpiochip9", 0 },
-    .flt_sel_v2_gpio = { "/dev/gpiochip9", 1 },
-    .flt_sel_24_gpio = { "/dev/gpiochip9", 2 },
+    .rfb_config =
+        kaonic::comm::rf215_radio_config {
+            .name = "rfb",
+            .spi =
+                (drivers::spi_config) {
+                    .dev = "/dev/spidev3.0",
+                    .speed = 5 * 1000 * 1000,
+                },
+            .rst_gpio = { "/dev/gpiochip4", 13 },
+            .irq_gpio = { "/dev/gpiochip4", 15 },
+            .flt_sel_v1_gpio = { "/dev/gpiochip9", 0 },
+            .flt_sel_v2_gpio = { "/dev/gpiochip9", 1 },
+            .flt_sel_24_gpio = { "/dev/gpiochip9", 2 },
+        },
 };
 
-static const comm::serial::config serial_config {
-    .tty_path = std::string { "/dev/ttyGS0" },
-    .baud_rate = 115200,
-};
+static auto select_machine_config() noexcept -> const kaonic_machine_config& {
+
+    std::string machine;
+    {
+        std::ifstream file("/etc/kaonic/kaonic_machine");
+        if (file) {
+            std::getline(file, machine);
+        }
+    }
+
+    if (machine == "stm32mp1-kaonic-protoa") {
+        return machine_config_protoa;
+    }
+
+    return machine_config_protob;
+}
 
 static auto create_radio(const kaonic::comm::rf215_radio_config& config)
     -> std::shared_ptr<comm::rf215_radio> {
@@ -87,11 +142,13 @@ auto main(int argc, char** argv) noexcept -> int {
 
     log::info("commd: start service - {}", kaonic::info::version);
 
+    const auto& machine_config = select_machine_config();
+
     std::vector<std::shared_ptr<comm::radio>> radios;
 
     // Initialize Radio Frontend B
     {
-        const auto radio = create_radio(rfb_config);
+        const auto radio = create_radio(machine_config.rfb_config);
         if (radio) {
             radios.push_back(radio);
         }
@@ -99,7 +156,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     // Initialize Radio Frontend A
     {
-        const auto radio = create_radio(rfa_config);
+        const auto radio = create_radio(machine_config.rfa_config);
         if (radio) {
             radios.push_back(radio);
         }
@@ -119,7 +176,6 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const auto grpc_listener = std::make_shared<comm::grpc_radio_listener>(grpc_service);
 
-    // radio_service->attach_listener(serial_listener);
     radio_service->attach_listener(grpc_listener);
 
     log::info("commd: start grpc service");

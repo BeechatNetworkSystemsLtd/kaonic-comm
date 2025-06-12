@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument(
         "-s", "--sign-key",
         type=str,
-        required=True,
+        default="",
         help="Path to signing key"
     )
 

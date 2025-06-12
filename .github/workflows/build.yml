@@ -60,6 +60,7 @@ jobs:
 
       - name: Create Kaonic OTA package
         run: |
+          echo $(git describe --tags --long)
           mkdir -p deploy
           echo "${{ secrets.BEECHAT_KAONIC_COMM_OTA_KEY }}" > ota_sign_key.pem
           chmod 600 ota_sign_key.pem
@@ -67,9 +68,10 @@ jobs:
             -b ./build \
             -o ./deploy \
             -s ota_sign_key.pem
+            --keep
 
       - name: Upload OTA package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ota-package
-          path: deploy/kaonic-comm-ota.zip
+          name: kaonic-comm-ota
+          path: deploy/kaonic-comm-ota/*

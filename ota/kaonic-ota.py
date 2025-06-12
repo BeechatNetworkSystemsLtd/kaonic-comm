@@ -98,6 +98,8 @@ def upload_ota():
             logger.info("Uploaded zip extraction")
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(temp_dir)
+                # List extracted files for debugging using os.listdir
+                logger.info(f"Extracted files: {os.listdir(temp_dir)}")
         except zipfile.BadZipFile:
             logger.error("Zip wasn't extracted")
             return jsonify({"detail": "Invalid ZIP file"}), 400
@@ -212,4 +214,4 @@ def restore_backup():
 
 if __name__ == "__main__":
     validate_app_file()
-    app.run(host="0.0.0.0", port=8682, debug=True)
+    app.run(host="0.0.0.0", port=8682)

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-yocto-ota:
+  build-kaonic-comm-ota:
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -20,10 +20,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: |
+            apt-cache-${{ runner.os }}-
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build build-essential python3-pip
+          pip3 install cryptography pathlib
 
       - name: Install Kaonic Yocto SDK
         run: |

@@ -40,7 +40,7 @@ jobs:
 
       - name: Set up Yocto environment
         run: |
-          echo "source $HOME/yocto-sdk/environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi" >> $GITHUB_ENV
+          echo "source $HOME/yocto-sdk/environment-setup-cortexa7t2hf-neon-vfpv4-ostl-linux-gnueabi" >> $GITHUB_ENV
 
       - name: Build CMake project
         run: |

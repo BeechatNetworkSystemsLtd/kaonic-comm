@@ -1,11 +1,8 @@
-from contextlib import asynccontextmanager
-from cryptography import x509
+from flask import Flask, request, jsonify
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ed25519, padding
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
 from pathlib import Path
 
 import hashlib
@@ -16,7 +13,6 @@ import stat
 import subprocess
 import tempfile
 import time
-import uvicorn
 import zipfile
 
 BINARY_PATH = Path("/usr/bin")
@@ -28,14 +24,10 @@ HASH_PATH = METADATA_PATH / "kaonic-commd.sha256"
 BACKUP_PATH = METADATA_PATH / "kaonic-commd.bak"
 VERIFY_KEY_PATH = METADATA_PATH / "beechat-ota.pub.pem"
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("kaonic-ota")
+logging.basicConfig(level=logging.INFO)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    validate_app_file()
-    yield
-
-app = FastAPI(lifespan=lifespan)
+app = Flask(__name__)
 
 def validate_app_file():
     logger.info("Validate app file")
@@ -52,7 +44,7 @@ def validate_app_file():
     actual_hash = sha256sum(APP_PATH) if APP_PATH.exists() else ""
 
     if (not APP_PATH.exists() or not HASH_PATH.exists()) or (expected_hash != actual_hash):
-        logger.warn("Restoring app from the backup")
+        logger.warning("Restoring app from the backup")
         stop_kaonic_commd()
         restore_backup()
         launch_kaonic_commd()
@@ -60,10 +52,8 @@ def validate_app_file():
 def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
     try:
         public_key = serialization.load_pem_public_key(key_path.read_bytes())
-
         file_data = file_path.read_bytes()
         signature = sig_path.read_bytes()
-
         if isinstance(public_key, rsa.RSAPublicKey):
             public_key.verify(
                 signature,
@@ -75,9 +65,7 @@ def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
             public_key.verify(signature, file_data)
         else:
             return False
-
         return True
-
     except InvalidSignature:
         logger.error("Signature verification failed")
         return False
@@ -85,13 +73,16 @@ def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
         logger.error(f"Error during signature verification: {e}")
         return False
 
-@app.post("/api/ota/commd/upload")
-async def upload_ota(file: UploadFile = File(...)):
+@app.route("/api/ota/commd/upload", methods=["POST"])
+def upload_ota():
+    if 'file' not in request.files:
+        return jsonify({"detail": "No file uploaded"}), 400
+    file = request.files['file']
     if file.content_type != "application/x-zip-compressed":
-        raise HTTPException(status_code=400, detail="Only ZIP files accepted")
-    
+        return jsonify({"detail": "Only ZIP files accepted"}), 400
+
     if not VERIFY_KEY_PATH.exists():
-        raise HTTPException(status_code=500, detail="OTA certificate is not present")
+        return jsonify({"detail": "OTA certificate is not present"}), 500
 
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         temp_dir = Path(tmp_dir_str)
@@ -101,8 +92,7 @@ async def upload_ota(file: UploadFile = File(...)):
         sig_path = temp_dir / "kaonic-commd.sig"
         version_path = temp_dir / "kaonic-commd.version"
 
-        with zip_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        file.save(zip_path)
 
         try:
             logger.info("Uploaded zip extraction")
@@ -110,16 +100,16 @@ async def upload_ota(file: UploadFile = File(...)):
                 zip_ref.extractall(temp_dir)
         except zipfile.BadZipFile:
             logger.error("Zip wasn't extracted")
-            raise HTTPException(status_code=400, detail="Invalid ZIP file")
+            return jsonify({"detail": "Invalid ZIP file"}), 400
 
         logger.info("Zip content validation")
         required_files = ["kaonic-commd", "kaonic-commd.sha256", "kaonic-commd.version", "kaonic-commd.sig"]
         for req_file in required_files:
             if not (temp_dir / req_file).exists():
                 logger.error(f"Missing {req_file} in OTA package")
-                raise HTTPException(status_code=400, detail=f"Missing {req_file} in OTA package")
+                return jsonify({"detail": f"Missing {req_file} in OTA package"}), 400
 
-        expected_hash = (hash_path).read_text().strip()
+        expected_hash = hash_path.read_text().strip()
         actual_hash = sha256sum(app_path)
 
         logger.info(f"Expected hash: {expected_hash}")
@@ -127,11 +117,11 @@ async def upload_ota(file: UploadFile = File(...)):
 
         if expected_hash != actual_hash:
             logger.error("SHA256 hash mismatch")
-            raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
-        
+            return jsonify({"detail": "SHA256 hash mismatch"}), 400
+
         if not validate_signature(app_path, sig_path, VERIFY_KEY_PATH):
             logger.error("Signature wasn't validated")
-            raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
+            return jsonify({"detail": "SHA256 hash mismatch"}), 400
 
         stop_kaonic_commd()
         backup_current()
@@ -156,21 +146,21 @@ async def upload_ota(file: UploadFile = File(...)):
             shutil.copy2(hash_path, HASH_PATH)
             shutil.copy2(version_path, VERSION_PATH)
             logger.info("Updated successfully")
-            return {"detail": "Update successful"}
+            return jsonify({"detail": "Update successful"})
         else:
             restore_backup()
             launch_kaonic_commd()
             logger.error("Failed to start new app, rollback done")
-            raise HTTPException(status_code=500, detail="Failed to start new app, rollback done")
+            return jsonify({"detail": "Failed to start new app, rollback done"}), 500
 
-@app.get("/api/ota/commd/version")
+@app.route("/api/ota/commd/version", methods=["GET"])
 def get_version():
     if not VERSION_PATH.exists() or not HASH_PATH.exists():
-        return JSONResponse(content={"version": None, "hash": None})
+        return jsonify({"version": None, "hash": None})
 
     version = VERSION_PATH.read_text().strip()
     hash_val = HASH_PATH.read_text().strip()
-    return {"version": version, "hash": hash_val}
+    return jsonify({"version": version, "hash": hash_val})
 
 def sha256sum(file_path: Path) -> str:
     h = hashlib.sha256()
@@ -207,13 +197,10 @@ def launch_kaonic_commd():
 
 def backup_current():
     logger.info("Backup current executable")
-
     if BACKUP_PATH.exists():
         BACKUP_PATH.unlink()
-
     if APP_PATH.exists():
         shutil.copy2(APP_PATH, BACKUP_PATH)
-
 
 def restore_backup():
     logger.info("Restoring backup")
@@ -224,9 +211,5 @@ def restore_backup():
         logger.info("Backup file is absent")
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "kaonic-ota:app",
-        host="0.0.0.0",
-        port=8682,
-        reload=True
-    )
+    validate_app_file()
+    app.run(host="0.0.0.0", port=8682, debug=True)

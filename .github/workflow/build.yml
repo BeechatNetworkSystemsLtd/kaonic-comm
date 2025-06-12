@@ -1,0 +1,67 @@
+name: Build Kaonic Comm OTA Package
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-yocto-ota:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential python3-pip
+
+      - name: Download Yocto SDK from latest GitHub release
+        run: |
+          ASSET_NAME="stm32mp1-kaonic-proto-sdk-aarch64.sh"
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/BeechatNetworkSystemsLtd/kaonic-yocto/releases/latest \
+            | grep "browser_download_url" \
+            | grep "$ASSET_NAME" \
+            | cut -d '"' -f 4)
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "SDK asset not found in latest release."
+            exit 1
+          fi
+          wget "$DOWNLOAD_URL" -O yocto-sdk.sh
+          chmod +x yocto-sdk.sh
+          ./yocto-sdk.sh -y -d $HOME/yocto-sdk
+
+      - name: Set up Yocto environment
+        run: |
+          echo "source $HOME/yocto-sdk/environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi" >> $GITHUB_ENV
+
+      - name: Build CMake project
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      - name: Prepare deploy directory
+        run: |
+          mkdir -p deploy
+
+      - name: Create OTA update package
+        run: |
+          echo "${{ secrets.BEECHAT_KAONIC_COMM_OTA_KEY }}" > ota_sign_key.pem
+          chmod 600 ota_sign_key.pem
+          python3 scripts/create-ota.py \
+            -b ./build \
+            -o ./deploy \
+            -s ota_sign_key.pem
+
+      - name: Upload OTA package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota-package
+          path: deploy/kaonic-comm-ota.zip

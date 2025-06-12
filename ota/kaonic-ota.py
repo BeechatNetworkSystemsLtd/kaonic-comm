@@ -26,7 +26,7 @@ METADATA_PATH = Path("/etc/kaonic")
 VERSION_PATH = METADATA_PATH / "kaonic-commd.version"
 HASH_PATH = METADATA_PATH / "kaonic-commd.sha256"
 BACKUP_PATH = METADATA_PATH / "kaonic-commd.bak"
-CERT_PATH = METADATA_PATH / "kaonic-commd.pem"
+VERIFY_KEY_PATH = METADATA_PATH / "beechat-ota.pub.pem"
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 def validate_app_file():
+    logger.info("Validate app file")
     if not METADATA_PATH.exists():
         logger.info("Metadata path is not existing. Creating empty one")
         METADATA_PATH.mkdir(parents=True)
@@ -51,30 +52,28 @@ def validate_app_file():
     actual_hash = sha256sum(APP_PATH) if APP_PATH.exists() else ""
 
     if (not APP_PATH.exists() or not HASH_PATH.exists()) or (expected_hash != actual_hash):
-        logger.info("Restoring app from the backup")
+        logger.warn("Restoring app from the backup")
         stop_kaonic_commd()
         restore_backup()
         launch_kaonic_commd()
 
-def validate_signature(binary_path, signature_path, certificate_path):
+def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
     try:
-        cert = x509.load_pem_x509_certificate(certificate_path.read_bytes())
-        public_key = cert.public_key()
+        public_key = serialization.load_pem_public_key(key_path.read_bytes())
 
-        message = binary_path.read_bytes()
-        signature = signature_path.read_bytes()
+        file_data = file_path.read_bytes()
+        signature = sig_path.read_bytes()
 
         if isinstance(public_key, rsa.RSAPublicKey):
             public_key.verify(
                 signature,
-                message,
+                file_data,
                 padding.PKCS1v15(),
                 hashes.SHA256()
             )
         elif isinstance(public_key, ed25519.Ed25519PublicKey):
-            public_key.verify(signature, message)
+            public_key.verify(signature, file_data)
         else:
-            logger.error(f"Unsupported key type in X.509: {type(public_key)}")
             return False
 
         return True
@@ -91,7 +90,7 @@ async def upload_ota(file: UploadFile = File(...)):
     if file.content_type != "application/x-zip-compressed":
         raise HTTPException(status_code=400, detail="Only ZIP files accepted")
     
-    if not CERT_PATH.exists():
+    if not VERIFY_KEY_PATH.exists():
         raise HTTPException(status_code=500, detail="OTA certificate is not present")
 
     with tempfile.TemporaryDirectory() as tmp_dir_str:
@@ -99,7 +98,7 @@ async def upload_ota(file: UploadFile = File(...)):
         zip_path = temp_dir / "upload.zip"
         app_path = temp_dir / "kaonic-commd"
         hash_path = temp_dir / "kaonic-commd.sha256"
-        sign_path = temp_dir / "kaonic-commd.sig"
+        sig_path = temp_dir / "kaonic-commd.sig"
         version_path = temp_dir / "kaonic-commd.version"
 
         with zip_path.open("wb") as buffer:
@@ -114,7 +113,7 @@ async def upload_ota(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Invalid ZIP file")
 
         logger.info("Zip content validation")
-        required_files = ["kaonic-commd", "kaonic-commd.sha256", "kaonic-commd.version"]
+        required_files = ["kaonic-commd", "kaonic-commd.sha256", "kaonic-commd.version", "kaonic-commd.sig"]
         for req_file in required_files:
             if not (temp_dir / req_file).exists():
                 logger.error(f"Missing {req_file} in OTA package")
@@ -130,7 +129,7 @@ async def upload_ota(file: UploadFile = File(...)):
             logger.error("SHA256 hash mismatch")
             raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
         
-        if not validate_signature(app_path, sign_path, CERT_PATH):
+        if not validate_signature(app_path, sig_path, VERIFY_KEY_PATH):
             logger.error("Signature wasn't validated")
             raise HTTPException(status_code=400, detail="SHA256 hash mismatch")
 

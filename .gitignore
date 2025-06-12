@@ -39,3 +39,4 @@ __pycache__/
 
 # Cache
 .cache
+stm32mp1-kaonic-*.sh

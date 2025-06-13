@@ -54,6 +54,7 @@ def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
         public_key = serialization.load_pem_public_key(key_path.read_bytes())
         file_data = file_path.read_bytes()
         signature = sig_path.read_bytes()
+
         if isinstance(public_key, rsa.RSAPublicKey):
             public_key.verify(
                 signature,
@@ -65,6 +66,8 @@ def validate_signature(file_path:Path, sig_path:Path, key_path:Path):
             public_key.verify(signature, file_data)
         else:
             return False
+
+        logger.info("Signature has been verified")
         return True
     except InvalidSignature:
         logger.error("Signature verification failed")

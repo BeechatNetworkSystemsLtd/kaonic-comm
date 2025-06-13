@@ -147,7 +147,7 @@ auto main(int argc, char** argv) noexcept -> int {
     std::vector<std::shared_ptr<comm::radio>> radios;
 
     // Initialize Radio Frontend B
-    {
+    if (false) {
         const auto radio = create_radio(machine_config.rfb_config);
         if (radio) {
             radios.push_back(radio);
@@ -164,7 +164,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,
-        .slot_duration = 50ms,
+        .slot_duration = 30ms,
         .gap_duration = 5ms,
         .beacon_interval = 500ms,
     };

@@ -16,12 +16,16 @@ message InfoResponse {}
 message StatisticsResponse {}
 
 service Device {
-  rpc GetInfo(kaonic.Empty) returns(InfoResponse) {}
-  rpc GetStatistics(kaonic.Empty) returns(StatisticsResponse) {}
+  rpc GetInfo(kaonic.Empty) returns (InfoResponse) {}
+  rpc GetStatistics(kaonic.Empty) returns (StatisticsResponse) {}
 }
 
 //***************************************************************************//
-enum RadioModule { MODULE_A = 0; MODULE_B = 1; }
+
+enum RadioModule {
+  MODULE_A = 0;
+  MODULE_B = 1;
+}
 
 message RadioFrame {
   repeated uint32 data = 1;
@@ -100,9 +104,9 @@ message ReceiveResponse {
 }
 
 service Radio {
-  rpc Configure(ConfigurationRequest) returns(kaonic.Empty) {}
-  rpc Transmit(TransmitRequest) returns(TransmitResponse) {}
-  rpc ReceiveStream(ReceiveRequest) returns(stream ReceiveResponse) {}
+  rpc Configure(ConfigurationRequest) returns (kaonic.Empty) {}
+  rpc Transmit(TransmitRequest) returns (TransmitResponse) {}
+  rpc ReceiveStream(ReceiveRequest) returns (stream ReceiveResponse) {}
 }
 
 //***************************************************************************//

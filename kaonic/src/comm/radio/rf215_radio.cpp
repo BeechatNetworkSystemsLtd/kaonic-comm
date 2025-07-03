@@ -212,22 +212,99 @@ auto rf215_radio::configure(const radio_config& config) -> error {
 
             if constexpr (std::is_same_v<T, radio_phy_config_ofdm>) {
 
+                uint8_t txdfe = 0x00;
+                uint8_t txcutc = 0x00;
+                uint8_t rxdfe = 0x00;
+                uint8_t rxbwc = 0x00;
+                uint8_t ofdmsw = 0b10000;
+
+                // Recommended values
+                // 6.11.2 Transmitter Configuration
+                // 6.11.3 Receiver Configuration
+                switch (phy_config.opt) {
+                    case 0:                   // Option 1
+                        txdfe |= 0x03;        // TXDFE.SR
+                        rxdfe |= 0x03;        // RXDFE.SR
+                        txdfe |= (0x04 << 5); // TRXDFE.RCUT
+                        txcutc |= 0x0A;       // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxdfe |= (0x04 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x09;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        } else {
+                            rxdfe |= (0x04 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x0A;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        }
+                        ofdmsw |= 5 << 5;
+                        break;
+                    case 1:                   // Option 2
+                        txdfe |= 0x03;        // TXDFE.SR
+                        rxdfe |= 0x03;        // RXDFE.SR
+                        txdfe |= (0x03 << 5); // TRXDFE.RCUT
+                        txcutc |= 0x08;       // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxdfe |= (0x02 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x07;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        } else {
+                            rxdfe |= (0x02 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x07;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        }
+                        ofdmsw |= 5 << 5;
+                        break;
+                    case 2:                   // Option 3
+                        txdfe |= 0x06;        // TXDFE.SR
+                        rxdfe |= 0x06;        // RXDFE.SR
+                        txdfe |= (0x03 << 5); // TRXDFE.RCUT
+                        txcutc |= 0x05;       // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxdfe |= (0x02 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x04;        // RXBWC.BW
+                            rxbwc |= 0b00000;     // RXBWC.IFS
+                        } else {
+                            rxdfe |= (0x03 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x05;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        }
+                        ofdmsw |= 4 << 5;
+                        break;
+                    case 3:                   // Option 4
+                        txdfe |= 0x06;        // TXDFE.SR
+                        rxdfe |= 0x06;        // RXDFE.SR
+                        txdfe |= (0x02 << 5); // TRXDFE.RCUT
+                        txcutc |= 0x03;       // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxdfe |= (0x01 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x02;        // RXBWC.BW
+                            rxbwc |= 0b10000;     // RXBWC.IFS
+                        } else {
+                            rxdfe |= (0x01 << 5); // RXDFE.RCUT
+                            rxbwc |= 0x03;        // RXBWC.BW
+                            rxbwc |= 0b00000;     // RXBWC.IFS
+                        }
+                        ofdmsw |= 3 << 5;
+                        break;
+                }
+
                 // Configure registers
                 const struct rf215_reg_value mod_values[] = {
 
                     // Radio
-                    { _active_trx->radio_regs->RG_RXBWC, 0x1A },
-                    { _active_trx->radio_regs->RG_RXDFE, 0x83 },
+                    { _active_trx->radio_regs->RG_RXBWC, rxbwc },
+                    { _active_trx->radio_regs->RG_RXDFE, rxdfe },
+                    { _active_trx->radio_regs->RG_TXCUTC, txcutc },
+                    { _active_trx->radio_regs->RG_TXDFE, txdfe },
                     { _active_trx->radio_regs->RG_EDD, 0x7A },
-                    { _active_trx->radio_regs->RG_TXCUTC, 0x0A },
-                    { _active_trx->radio_regs->RG_TXDFE, 0x83 },
 
                     // Baseband
-                    { _active_trx->baseband_regs->RG_PC, 0x0E },
+                    { _active_trx->baseband_regs->RG_PC, 0b1110 },
                     { _active_trx->baseband_regs->RG_OFDMC,
                       static_cast<uint8_t>(std::min(phy_config.opt, 3u)) },
                     { _active_trx->baseband_regs->RG_OFDMPHRTX,
                       static_cast<uint8_t>(std::min(phy_config.mcs, 6u)) },
+                    { _active_trx->baseband_regs->RG_OFDMSW, ofdmsw },
                 };
 
                 const struct rf215_reg_set reg_set = {
@@ -356,7 +433,7 @@ auto rf215_radio::configure(const radio_config& config) -> error {
                     { _active_trx->radio_regs->RG_AGCS, 0b100000u | 0b10111 },
 
                     // Baseband
-                    { _active_trx->baseband_regs->RG_PC, 0x0E },
+                    { _active_trx->baseband_regs->RG_PC, 0b1101 },
 
                     { _active_trx->baseband_regs->RG_FSKC0,
                       static_cast<uint8_t>(

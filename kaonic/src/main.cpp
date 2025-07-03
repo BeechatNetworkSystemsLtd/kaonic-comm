@@ -108,7 +108,7 @@ static auto select_machine_config() noexcept -> const kaonic_machine_config& {
     return machine_config_protob;
 }
 
-static auto create_radio(const kaonic::comm::rf215_radio_config& config)
+static auto create_radio(const kaonic::comm::rf215_radio_config& config, uint8_t channel)
     -> std::shared_ptr<comm::rf215_radio> {
     auto radio = std::make_shared<comm::rf215_radio>(config);
 
@@ -119,7 +119,7 @@ static auto create_radio(const kaonic::comm::rf215_radio_config& config)
 
     if (auto err = radio->configure({
             .freq = 869535,
-            .channel = 11,
+            .channel = channel,
             .channel_spacing = 200,
             .tx_power = 10,
             .phy_config =
@@ -146,17 +146,18 @@ auto main(int argc, char** argv) noexcept -> int {
 
     std::vector<std::shared_ptr<comm::radio>> radios;
 
-    // Initialize Radio Frontend B
-    if (false) {
-        const auto radio = create_radio(machine_config.rfb_config);
+
+    // Initialize Radio Frontend A
+    {
+        const auto radio = create_radio(machine_config.rfa_config, 11);
         if (radio) {
             radios.push_back(radio);
         }
     }
-
-    // Initialize Radio Frontend A
+    
+    // Initialize Radio Frontend B
     {
-        const auto radio = create_radio(machine_config.rfa_config);
+        const auto radio = create_radio(machine_config.rfb_config, 8);
         if (radio) {
             radios.push_back(radio);
         }

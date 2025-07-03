@@ -171,6 +171,8 @@ auto rf215_radio::configure(const radio_config& config) -> error {
 
     _active_trx = rf215_get_trx_by_freq(&_dev, config.freq);
 
+    const auto trx_type = _active_trx->type;
+
     auto rf = &_dev;
 
     const uint8_t tx_power = static_cast<uint8_t>(std::min(config.tx_power, 12u));
@@ -183,52 +185,234 @@ auto rf215_radio::configure(const radio_config& config) -> error {
 
             int rc = 0;
 
+            // Common registers
+            {
+                rf215_write_reg(rf, rf->common_regs->RG_RF_CLKO, 0x02);
+                rf215_write_reg(rf, _active_trx->radio_regs->RG_CMD, 0x02);
+                rf215_write_reg(rf, rf->rf24.radio_regs->RG_IRQM, 0x00);
+                rf215_write_reg(rf, rf->rf09.radio_regs->RG_IRQM, 0x00);
+                rf215_write_reg(rf, _active_trx->radio_regs->RG_IRQM, 0x1F);
+                // 7 6 5   4 3 2 1 0
+                // – PACUR TXPWR
+                rf215_write_reg(rf,
+                                _active_trx->radio_regs->RG_PAC,
+                                static_cast<uint8_t>(0b01100000 | tx_power));
+                // 7 6   5 4 3 2 1 0
+                // PADFE – – – – – –
+                rf215_write_reg(rf, _active_trx->radio_regs->RG_PADFE, 0b10000000);
+
+                // 7          6 5    4     3    2   1 0
+                // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
+                rf215_write_reg(rf, _active_trx->radio_regs->RG_AUXS, 0b01000010);
+
+                rf215_write_reg(rf, rf->rf24.baseband_regs->RG_IRQM, 0x00);
+                rf215_write_reg(rf, rf->rf09.baseband_regs->RG_IRQM, 0x00);
+                rf215_write_reg(rf, _active_trx->baseband_regs->RG_IRQM, 0x12);
+            }
+
             if constexpr (std::is_same_v<T, radio_phy_config_ofdm>) {
 
                 // Configure registers
-                const struct rf215_reg_value mod_ofdm_values[] = {
-                    // clang-format off
+                const struct rf215_reg_value mod_values[] = {
 
                     // Radio
-                    { rf->common_regs->RG_RF_CLKO, 0x02 },
-
-                    { rf->rf09.radio_regs->RG_CMD, 0x02 },
-                    { rf->rf24.radio_regs->RG_IRQM, 0x00 },
-                    { rf->rf09.radio_regs->RG_IRQM, 0x1F },
-
-                    { rf->rf09.radio_regs->RG_RXBWC, 0x1A },
-                    { rf->rf09.radio_regs->RG_RXDFE, 0x83 },
-
-                    { rf->rf09.radio_regs->RG_EDD, 0x7A },
-
-                    { rf->rf09.radio_regs->RG_TXCUTC, 0x0A },
-                    { rf->rf09.radio_regs->RG_TXDFE, 0x83 },
-
-                    // 7 6 5   4 3 2 1 0
-                    // – PACUR TXPWR
-                    { rf->rf09.radio_regs->RG_PAC, static_cast<uint8_t>(0b01100000 | tx_power) },
-                    
-                    // 7 6   5 4 3 2 1 0
-                    // PADFE – – – – – – 
-                    { rf->rf09.radio_regs->RG_PADFE, 0b10000000 },
-
-                    // 7          6 5    4     3    2   1 0
-                    // EXTLNAB YP AGCMAP AVEXT AVEN AVS PAVC
-                    { rf->rf09.radio_regs->RG_AUXS, 0b01000010 },
+                    { _active_trx->radio_regs->RG_RXBWC, 0x1A },
+                    { _active_trx->radio_regs->RG_RXDFE, 0x83 },
+                    { _active_trx->radio_regs->RG_EDD, 0x7A },
+                    { _active_trx->radio_regs->RG_TXCUTC, 0x0A },
+                    { _active_trx->radio_regs->RG_TXDFE, 0x83 },
 
                     // Baseband
-                    { rf->rf24.baseband_regs->RG_IRQM, 0x00 },
-                    { rf->rf09.baseband_regs->RG_IRQM, 0x12 },
-                    { rf->rf09.baseband_regs->RG_PC, 0x0E },
-                    { rf->rf09.baseband_regs->RG_OFDMC, static_cast<uint8_t>(std::min(phy_config.opt, 3u)) },
-                    { rf->rf09.baseband_regs->RG_OFDMPHRTX, static_cast<uint8_t>(std::min(phy_config.mcs, 6u)) },
-
-                    // clang-format on
+                    { _active_trx->baseband_regs->RG_PC, 0x0E },
+                    { _active_trx->baseband_regs->RG_OFDMC,
+                      static_cast<uint8_t>(std::min(phy_config.opt, 3u)) },
+                    { _active_trx->baseband_regs->RG_OFDMPHRTX,
+                      static_cast<uint8_t>(std::min(phy_config.mcs, 6u)) },
                 };
 
                 const struct rf215_reg_set reg_set = {
-                    .values = mod_ofdm_values,
-                    .len = RF215_REG_VALUE_ARRAY_COUNT(mod_ofdm_values),
+                    .values = mod_values,
+                    .len = RF215_REG_VALUE_ARRAY_COUNT(mod_values),
+                };
+
+                rc = rf215_write_reg_set(rf, &reg_set);
+            }
+
+            if constexpr (std::is_same_v<T, radio_phy_config_fsk>) {
+
+                uint8_t txcutc = 0x00;
+                uint8_t txdfe = 0x00;
+                uint8_t rxdfe = 0x00;
+                uint8_t rxbwc = 0x00;
+
+                // Recommended configuration for Symbol Rate
+                // 6.10.4 Transmit Operation and Configuration
+                // 6.10.5 Receive Operation and Configuration
+                switch (phy_config.srate) {
+                    case 0:                                     // 50kHz
+                        txdfe |= 8;                             // TXDFE.SR
+                        rxdfe |= 10;                            // RXDFE.SR
+                        txcutc |= (3 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 0 : 0; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0; // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0; // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : 0; // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 0 : 1;        // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 1;        // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : (1 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                    case 1:                                     // 100kHz
+                        txdfe |= 4;                             // TXDFE.SR
+                        rxdfe |= 5;                             // RXDFE.SR
+                        txcutc |= (2 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 1 : 3; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 1 : 3; // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0; // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : 0; // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 1 : 4;        // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0;        // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : (1 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                    case 2:                                     // 150kHz
+                        txdfe |= 2;                             // TXDFE.SR
+                        rxdfe |= 4;                             // RXDFE.SR
+                        txcutc |= (2 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 3 : 5; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 3 : 4; // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0; // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : 0; // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 3 : 6;        // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0;        // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : (2 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                    case 3:                                     // 200kHz
+                        txdfe |= 2;                             // TXDFE.SR
+                        rxdfe |= 4;                             // RXDFE.SR
+                        txcutc |= (2 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 4 : 6; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 3 : 5;               // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0b1000;          // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? (1 << 5) : (1 << 5); // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 4 : 6;               // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0;               // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? (1 << 5) : (3 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                    case 4:                                     // 300kHz
+                        txdfe |= 1;                             // TXDFE.SR
+                        rxdfe |= 2;                             // RXDFE.SR
+                        txcutc |= (1 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 6 : 8; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 5 : 6; // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 1 : 0; // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : 0; // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 6 : 7;        // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0;        // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : (1 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                    case 5:                                     // 400kHz
+                        txdfe |= 1;                             // TXDFE.SR
+                        rxdfe |= 2;                             // RXDFE.SR
+                        txcutc |= (1 << 6);                     // TXCUTC.PARAMP
+                        txcutc |= phy_config.midx == 0 ? 7 : 9; // TXCUTC.LPFCUT
+                        if (trx_type == RF215_TRX_TYPE_RF09) {
+                            rxbwc |= phy_config.midx == 0 ? 6 : 8;        // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0b1000;   // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? 0 : (1 << 5); // RXDFE.RCUT
+                        } else {
+                            rxbwc |= phy_config.midx == 0 ? 7 : 8;               // RXBWC.BW
+                            rxbwc |= phy_config.midx == 0 ? 0 : 0b1000;          // RXBWC.IFS
+                            rxdfe |= phy_config.midx == 0 ? (1 << 5) : (2 << 5); // RXDFE.RCUT
+                        }
+                        break;
+                }
+
+                txdfe |= phy_config.midx == 0 ? 0 : (4 << 5);
+
+                // Configure registers
+                const struct rf215_reg_value mod_values[] = {
+
+                    // Radio
+                    { _active_trx->radio_regs->RG_RXBWC, rxbwc },
+                    { _active_trx->radio_regs->RG_RXDFE, rxdfe },
+                    { _active_trx->radio_regs->RG_EDD, 0x7A },
+                    { _active_trx->radio_regs->RG_TXCUTC, txcutc },
+                    { _active_trx->radio_regs->RG_TXDFE, txdfe },
+                    { _active_trx->radio_regs->RG_AGCC, 0b1000000u | 0b1 },
+                    { _active_trx->radio_regs->RG_AGCS, 0b100000u | 0b10111 },
+
+                    // Baseband
+                    { _active_trx->baseband_regs->RG_PC, 0x0E },
+
+                    { _active_trx->baseband_regs->RG_FSKC0,
+                      static_cast<uint8_t>(
+                          ((phy_config.bt & 0b11) << 6) | ((phy_config.midxs & 0b11) << 4)
+                          | ((phy_config.midx & 0b111) << 1) | (phy_config.mord & 0b1)) },
+
+                    { _active_trx->baseband_regs->RG_FSKC1,
+                      static_cast<uint8_t>(
+                          (phy_config.freq_inversion ? 0b10000 : 0) | (phy_config.srate & 0b1111)
+                          | static_cast<uint8_t>(phy_config.preamble_length & 0b1100000000)) },
+
+                    { _active_trx->baseband_regs->RG_FSKC2,
+                      static_cast<uint8_t>(
+                          ((phy_config.pdtm & 1) << 7) | ((phy_config.rxo & 0b11) << 5)
+                          | ((phy_config.rxpto & 1) << 4) | ((phy_config.mse & 1) << 3)
+                          | (phy_config.preamble_inversion ? 0b100 : 0u)
+                          | ((phy_config.fecs & 1) << 1) | (phy_config.fecie ? 1 : 0)) },
+
+                    { _active_trx->baseband_regs->RG_FSKC3,
+                      static_cast<uint8_t>(((phy_config.sfdt & 0b1111) << 4)
+                                           | (phy_config.pdt & 0b1111)) },
+
+                    { _active_trx->baseband_regs->RG_FSKC4,
+                      static_cast<uint8_t>(
+                          (phy_config.sftq ? 0b1000000 : 0) | ((phy_config.sfd32 & 0b1) << 5)
+                          | (phy_config.rawbit ? 0b10000 : 0) | ((phy_config.csfd1 & 0b11) << 2)
+                          | (phy_config.csfd0 & 0b11)) },
+
+                    { _active_trx->baseband_regs->RG_FSKPLL,
+                      static_cast<uint8_t>((phy_config.preamble_length & 0b11111111)) },
+
+                    { _active_trx->baseband_regs->RG_FSKSFD0L,
+                      static_cast<uint8_t>((phy_config.sfd0 & 0b11111111)) },
+                    { _active_trx->baseband_regs->RG_FSKSFD0H,
+                      static_cast<uint8_t>(((phy_config.sfd0 >> 8) & 0b11111111)) },
+                    { _active_trx->baseband_regs->RG_FSKSFD1L,
+                      static_cast<uint8_t>((phy_config.sfd1 & 0b11111111)) },
+                    { _active_trx->baseband_regs->RG_FSKSFD1H,
+                      static_cast<uint8_t>(((phy_config.sfd1 >> 8) & 0b11111111)) },
+
+                    { _active_trx->baseband_regs->RG_FSKPHRTX,
+                      static_cast<uint8_t>(((phy_config.sfd & 0b1) << 3)
+                                           | ((phy_config.dw & 0b1) << 2)) },
+
+                    { _active_trx->baseband_regs->RG_FSKDM,
+                      static_cast<uint8_t>((phy_config.pe ? 0b10 : 0)
+                                           | (phy_config.en ? 0b01 : 0)) },
+
+                    { _active_trx->baseband_regs->RG_FSKPE0, phy_config.fskpe0 },
+                    { _active_trx->baseband_regs->RG_FSKPE1, phy_config.fskpe1 },
+                    { _active_trx->baseband_regs->RG_FSKPE2, phy_config.fskpe2 },
+                };
+
+                const struct rf215_reg_set reg_set = {
+                    .values = mod_values,
+                    .len = RF215_REG_VALUE_ARRAY_COUNT(mod_values),
                 };
 
                 rc = rf215_write_reg_set(rf, &reg_set);

@@ -65,6 +65,40 @@ auto grpc_service::Configure(::grpc::ServerContext* context,
             .opt = request->ofdm().opt(),
         };
     }
+    if (request->has_fsk()) {
+        phy_config = radio_phy_config_fsk {
+            .bt = static_cast<uint8_t>(request->fsk().bt()),
+            .midxs = static_cast<uint8_t>(request->fsk().midxs()),
+            .midx = static_cast<uint8_t>(request->fsk().midx()),
+            .mord = static_cast<uint8_t>(request->fsk().mord()),
+            .preamble_length = static_cast<uint16_t>(request->fsk().preamble_length()),
+            .freq_inversion = request->fsk().freq_inversion(),
+            .srate = static_cast<uint8_t>(request->fsk().srate()),
+            .pdtm = static_cast<uint8_t>(request->fsk().pdtm()),
+            .rxo = static_cast<uint8_t>(request->fsk().rxo()),
+            .rxpto = static_cast<uint8_t>(request->fsk().rxpto()),
+            .mse = static_cast<uint8_t>(request->fsk().mse()),
+            .preamble_inversion = request->fsk().preamble_inversion(),
+            .fecs = static_cast<uint8_t>(request->fsk().fecs()),
+            .fecie = request->fsk().fecie(),
+            .sfdt = static_cast<uint8_t>(request->fsk().sfdt()),
+            .pdt = static_cast<uint8_t>(request->fsk().pdt()),
+            .sftq = request->fsk().sftq(),
+            .sfd32 = static_cast<uint8_t>(request->fsk().sfd32()),
+            .rawbit = request->fsk().rawbit(),
+            .csfd1 = static_cast<uint8_t>(request->fsk().csfd1()),
+            .csfd0 = static_cast<uint8_t>(request->fsk().csfd0()),
+            .sfd0 = static_cast<uint8_t>(request->fsk().sfd0()),
+            .sfd1 = static_cast<uint8_t>(request->fsk().sfd1()),
+            .sfd = static_cast<uint8_t>(request->fsk().sfd()),
+            .dw = static_cast<uint8_t>(request->fsk().dw()),
+            .pe = request->fsk().pe(),
+            .en = request->fsk().en(),
+            .fskpe0 = static_cast<uint8_t>(request->fsk().fskpe0()),
+            .fskpe1 = static_cast<uint8_t>(request->fsk().fskpe1()),
+            .fskpe2 = static_cast<uint8_t>(request->fsk().fskpe2()),
+        };
+    }
 
     radio_config config {
         .freq = freq,

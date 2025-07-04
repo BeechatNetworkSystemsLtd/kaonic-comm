@@ -43,3 +43,4 @@ stm32mp1-kaonic-*.sh
 deploy
 
 **/.DS_Store
+scripts-local

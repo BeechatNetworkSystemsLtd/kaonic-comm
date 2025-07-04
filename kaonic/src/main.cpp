@@ -27,7 +27,7 @@ struct kaonic_machine_config {
     kaonic::comm::rf215_radio_config rfb_config;
 };
 
-static constexpr auto rf215_spi_freq = 10 * 1000 * 1000;
+static constexpr auto rf215_spi_freq = 5 * 1000 * 1000;
 
 static const kaonic_machine_config machine_config_protoa = {
     .rfa_config =
@@ -146,7 +146,6 @@ auto main(int argc, char** argv) noexcept -> int {
 
     std::vector<std::shared_ptr<comm::radio>> radios;
 
-
     // Initialize Radio Frontend A
     {
         const auto radio = create_radio(machine_config.rfa_config, 11);
@@ -154,10 +153,10 @@ auto main(int argc, char** argv) noexcept -> int {
             radios.push_back(radio);
         }
     }
-    
+
     // Initialize Radio Frontend B
-    {
-        const auto radio = create_radio(machine_config.rfb_config, 8);
+    if (false) {
+        const auto radio = create_radio(machine_config.rfb_config, 1);
         if (radio) {
             radios.push_back(radio);
         }
@@ -165,8 +164,8 @@ auto main(int argc, char** argv) noexcept -> int {
 
     const comm::mesh::config mesh_config {
         .packet_pattern = 0xB1EE,
-        .slot_duration = 30ms,
-        .gap_duration = 5ms,
+        .slot_duration = 15ms,
+        .gap_duration = 2ms,
         .beacon_interval = 500ms,
     };
 

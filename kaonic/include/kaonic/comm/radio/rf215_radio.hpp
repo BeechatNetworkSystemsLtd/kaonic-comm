@@ -84,6 +84,9 @@ private:
     rf215_device _dev;
     rf215_trx* _active_trx = nullptr;
 
+    size_t _tx_counter = 0;
+    size_t _rx_counter = 0;
+
     mutable std::mutex _mut;
 };
 

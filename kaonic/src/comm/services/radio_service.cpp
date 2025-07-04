@@ -28,7 +28,7 @@ radio_service::radio_service(const mesh::config& config,
 
     for (const auto& net : _radio_networks) {
         log::debug("radio: start network");
-        net->start();
+        auto err = net->start();
     }
 }
 
@@ -43,7 +43,7 @@ auto radio_service::configure(uint8_t module, const radio_config& config) -> err
 
 auto radio_service::transmit(uint8_t module, const mesh::frame& frame) -> error {
     if (module >= _radio_networks.size()) {
-        log::error("[Radio Service] Unable to transmit: invalid module index");
+        log::error("radio_service: invalid module index for tx");
         return error::invalid_arg();
     }
 

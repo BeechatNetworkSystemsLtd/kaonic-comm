@@ -531,19 +531,36 @@ auto rf215_radio::transmit(const radio_frame& frame) -> error {
         return error::precondition_failed();
     }
 
-    // log::trace("rf215: transmit {} bytes", frame.len);
-    // print_frame(frame, "TX");
-
     rf215_frame rf_frame { 0 };
     rf_frame.len = frame.len;
     memcpy(rf_frame.data, frame.data, frame.len);
 
-    if (auto rc = rf215_baseband_tx_frame(_active_trx, &rf_frame); rc != 0) {
-        log::warn("rf215: transmit fail - {}", rc);
-        return error::fail();
+    const auto start_time = rf215_current_time(&_dev);
+
+    auto err = error::fail();
+    for (size_t repeat = 0; repeat < 4; ++repeat) {
+
+        if (auto rc = rf215_baseband_cca_tx_frame(_active_trx, &rf_frame); rc != 0) {
+            log::warn("rf215: channel busy rc={}, repeat={}", rc, repeat);
+            continue;
+        }
+
+        err = error::ok();
+
+        break;
     }
 
-    return error::ok();
+    const auto end_time = rf215_current_time(&_dev);
+    ++_tx_counter;
+    // log::trace("rf215: {} tx [{:>10}] >> {:>4} B in {}msec",
+    //            _config.name,
+    //            _tx_counter,
+    //            frame.len,
+    //            end_time - start_time);
+
+    // print_frame(frame, "TX");
+
+    return err;
 }
 
 auto rf215_radio::receive(radio_frame& frame, const std::chrono::milliseconds& timeout) -> error {
@@ -561,7 +578,8 @@ auto rf215_radio::receive(radio_frame& frame, const std::chrono::milliseconds& t
     auto err = error::timeout();
     if ((rc == 0) && (len > 0)) {
         frame.len = len;
-        // log::trace("rf215: receive {} bytes", len);
+        ++_rx_counter;
+        // log::trace("rf215: {} rx [{:>10}] << {:>4} B", _config.name, _rx_counter, len);
         // print_frame(frame, "RX");
         err = error::ok();
     }

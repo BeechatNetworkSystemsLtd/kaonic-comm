@@ -91,6 +91,8 @@ static const kaonic_machine_config machine_config_protob = {
         },
 };
 
+static const kaonic_machine_config machine_config_protoc = machine_config_protob;
+
 static auto select_machine_config() noexcept -> const kaonic_machine_config& {
 
     std::string machine;
@@ -105,7 +107,15 @@ static auto select_machine_config() noexcept -> const kaonic_machine_config& {
         return machine_config_protoa;
     }
 
-    return machine_config_protob;
+    if (machine == "stm32mp1-kaonic-protob") {
+        return machine_config_protob;
+    }
+
+    if (machine == "stm32mp1-kaonic-protoc") {
+        return machine_config_protoc;
+    }
+
+    return machine_config_protoc;
 }
 
 static auto create_radio(const kaonic::comm::rf215_radio_config& config, uint8_t channel)
